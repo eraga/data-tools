@@ -39,7 +39,7 @@ fun TypeName.javaToKotlinType(type: Element? = null): TypeName {
 }
 
 fun TypeName.classToInitializer(map:  Map<TypeName, ClassName>): String {
-    if (this.toString().contains("Array"))
+    if (this.toString().contains("Array<"))
         return "arrayOf()"
 
     return if (this is ParameterizedTypeName &&
