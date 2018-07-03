@@ -1,0 +1,119 @@
+buildscript {
+    ext.kotlinVersion = '1.2.50'
+
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+    }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+    }
+
+    apply plugin: 'java'
+    apply plugin: 'java-library'
+    apply plugin: 'maven-publish'
+    apply plugin: 'signing'
+    apply plugin: 'kotlin'
+}
+
+
+subprojects {
+    group 'net.eraga.tools.model'
+    version = "$version"
+
+    ext {
+        nexusUsername = "unknown"
+        nexusPassword = "unknown"
+    }
+
+    task sourcesJar(type: Jar) {
+        from sourceSets.main.allJava
+        classifier 'sources'
+    }
+
+    task javadocJar(type: Jar) {
+        from javadoc
+        classifier 'javadoc'
+    }
+
+//    task
+
+    task loadDeployProperties {
+        File propsFile = new File("${rootProject.projectDir}/deploy.properties")
+        Properties props = new Properties()
+
+        if (propsFile.exists()) {
+            props.load(new FileInputStream(propsFile))
+            props.each { prop ->
+                project.ext.set(prop.key, prop.value)
+            }
+        }
+
+        doFirst {
+            if (!propsFile.exists())
+                throw new GradleException("No deploy properties file found at ${propsFile.path}. Publishing is not " +
+                        "possible.")
+        }
+    }
+
+    publish.dependsOn loadDeployProperties
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+//            artifactId 'model-processor'
+                artifactId = jar.baseName
+                from components.java
+
+                artifact sourcesJar
+                artifact javadocJar
+                pom {
+                    name = 'Model Processor'
+                    description = 'Model Processor'
+                    url = 'https://github.com/eraga/model-processing-tools'
+                    licenses {
+                        license {
+                            name = 'The Apache License, Version 2.0'
+                            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'klaus'
+                            name = 'Klaus Schwartz'
+                            email = 'klaus@eraga.net'
+                        }
+                    }
+                    scm {
+                        connection = "scm:git@github.com:eraga/model-processing-tools.git"
+                        developerConnection = 'scm:git@github.com:eraga/model-processing-tools.git'
+                        url = 'https://github.com/eraga/model-processing-tools'
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                credentials {
+                    username = nexusUsername
+                    password = nexusPassword
+                }
+
+                def releasesRepoUrl = "http://nexus.eraga.net/content/repositories/public-releases/"
+                def snapshotsRepoUrl = "http://nexus.eraga.net/content/repositories/public-snapshots"
+                url version.endsWith("SNAPSHOT") ? snapshotsRepoUrl : releasesRepoUrl
+            }
+        }
+    }
+}
+
+
+
+

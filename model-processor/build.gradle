@@ -1,0 +1,31 @@
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+
+    compile project(":model-annotations")
+
+    implementation "com.google.auto.service:auto-service:1.0-rc2"
+    implementation "com.squareup:kotlinpoet:0.7.0"
+
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+
+
+
+//signing {
+//    sign publishing.publications.mavenJava
+//}
