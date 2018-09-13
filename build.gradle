@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlinVersion = '1.2.50'
+    ext.kotlinVersion = '1.2.70'
 
     repositories {
         maven {
@@ -77,7 +77,7 @@ subprojects {
                 pom {
                     name = 'Model Processor'
                     description = 'Model Processor'
-                    url = 'https://github.com/eraga/model-processing-tools'
+                    url = 'https://github.com/eraga/kotlin-data-tools'
                     licenses {
                         license {
                             name = 'The Apache License, Version 2.0'
@@ -92,9 +92,9 @@ subprojects {
                         }
                     }
                     scm {
-                        connection = "scm:git@github.com:eraga/model-processing-tools.git"
-                        developerConnection = 'scm:git@github.com:eraga/model-processing-tools.git'
-                        url = 'https://github.com/eraga/model-processing-tools'
+                        connection = "scm:git@github.com:eraga/kotlin-data-tools.git"
+                        developerConnection = 'scm:git@github.com:eraga/kotlin-data-tools.git'
+                        url = 'https://github.com/eraga/kotlin-data-tools'
                     }
                 }
             }
