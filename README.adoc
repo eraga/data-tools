@@ -44,7 +44,7 @@ dependencies {
 === Prepare POSOs
 
 Describe your POJO as kotlin interface
-```
+```kotlin
 @ImplementModel(implSuffix = "Data")
 interface Category {
     val id: Int
@@ -56,7 +56,7 @@ interface Category {
 Run `./gradlew build` and you will get following kapt output in
 your `build/generated` folder:
 
-```
+```Kotlin
 import java.io.Serializable
 import kotlin.Int
 import kotlin.String
@@ -88,7 +88,7 @@ fun categoryData(init: CategoryData.() -> Unit): Category {
 
 Example DSL to create an object of `Category` type.
 
-```
+```Kotlin
 val animals = categoryData {
         name = "Animals"
         id = 1
@@ -99,7 +99,7 @@ val animals = categoryData {
 
 
 
-```
+```Kotlin
 class OtherCategory(
         override val id: Int,
         override val weight: Int,
