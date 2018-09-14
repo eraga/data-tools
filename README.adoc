@@ -18,15 +18,14 @@ make the rest of it:
 === Setup Gradle
 
 Don't forget to add kapt plugin to `build.gradle`:
-```
+```Kotlin
 plugins {
     id 'kotlin-kapt'
 }
 ```
 
 Add a custom repository and `model` dependencies:
-```
-
+```Kotlin
 repositories {
     mavenCentral()
 
