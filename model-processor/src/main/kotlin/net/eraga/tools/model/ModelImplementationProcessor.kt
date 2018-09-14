@@ -36,6 +36,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
             map["Double"] = defaults.Double
             map["Float"] = defaults.Float
             map["Int"] = defaults.Int
+            map["Long"] = defaults.Long
             map["Short"] = defaults.Short
             map["String"] = "\"${defaults.String}\""
 
@@ -108,12 +109,12 @@ class ModelImplementationProcessor : AbstractProcessor() {
         if (elements.any()) {
 
             File(kotlinGenerated).mkdirs()
-            elements.forEach {
-                if(it.kind.isInterface) {
-                    generateImplementation(it, elements.map { it.qualifiedName.toString() })
+            elements.forEach { typeElement ->
+                if(typeElement.kind.isInterface) {
+                    generateImplementation(typeElement, elements.map { it.qualifiedName.toString() })
                 } else {
                     messager.printMessage(Diagnostic.Kind.ERROR, "Only interfaces can be annotated with " +
-                            "$PROCESSED_ANNOTATION: ${it.qualifiedName} is ${it.kind.name}")
+                            "$PROCESSED_ANNOTATION: ${typeElement.qualifiedName} is ${typeElement.kind.name}")
                 }
             }
         }

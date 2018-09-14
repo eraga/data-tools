@@ -6,5 +6,10 @@
 == How?
 
 ```
+
+dependencies {
+    compileOnly "net.eraga.tools.model:model-annotations:1.0-SNAPSHOT"
+    kapt "net.eraga.tools.model:model-processor:1.0-SNAPSHOT"
+}
 ```
 

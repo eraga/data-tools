@@ -52,6 +52,7 @@ annotation class PrimitiveInitializers(
         val Byte: Byte = 0,
         val Short: Short = 0,
         val Int: Int = 0,
+        val Long: Long = 0L,
         val Float: Float = 0.0f,
         val Double: Double = 0.0
 )
