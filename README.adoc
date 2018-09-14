@@ -2,10 +2,38 @@
 
 == Why?
 
+Sharing a huge and complicated set of data model classes (POJOs) across multiple
+applications can be painful. That set of tools greatly reduces a lot of boilerplate
+code.
+
+What you need is to describe an interface of data class. Annotation processing will
+make the rest of it:
+
+* Generate mutable interface;
+* Generate default `data class` implementation;
+* Generate DSL function for `data class` initialization.
 
 == How?
 
+=== Setup Gradle
+
+Don't forget to add kapt plugin to `build.gradle`:
 ```
+plugins {
+    id 'kotlin-kapt'
+}
+```
+
+Add a custom repository and `model` dependencies:
+```
+
+repositories {
+    mavenCentral()
+
+    maven {
+        url 'https://nexus.eraga.net/content/repositories/public-snapshots'
+    }
+}
 
 dependencies {
     compileOnly "net.eraga.tools.model:model-annotations:1.0-SNAPSHOT"
@@ -13,3 +41,79 @@ dependencies {
 }
 ```
 
+=== Prepare POSOs
+
+Describe your POJO as kotlin interface
+```
+@ImplementModel(implSuffix = "Data")
+interface Category {
+    val id: Int
+    val weight: Int
+    val name: String
+}
+```
+
+Run `./gradlew build` and you will get following kapt output in
+your `build/generated` folder:
+
+```
+import java.io.Serializable
+import kotlin.Int
+import kotlin.String
+import kotlin.Unit
+
+interface CategoryMutableModel : Category {
+    override var id: Int
+    override var weight: Int
+    override var name: String
+}
+
+data class CategoryData(
+        override var id: Int = 0,
+        override var weight: Int = 0,
+        override var name: String = ""
+) : CategoryMutableModel, Serializable
+
+fun categoryData(init: CategoryData.() -> Unit): Category {
+    val instance = CategoryData()
+    instance.init()
+    return instance
+}
+```
+
+
+=== Use it in your project
+
+==== Using default implementations
+
+Example DSL to create an object of `Category` type.
+
+```
+val animals = categoryData {
+        name = "Animals"
+        id = 1
+        weight = 10
+    }
+```
+==== Using own and default implementations
+
+
+
+```
+class OtherCategory(
+        override val id: Int,
+        override val weight: Int,
+        override val name: String,
+        var parent: Category) : Category {
+}
+
+fun main(args: Array<String>) {
+    val animals = categoryData {
+        name = "Animals"
+        id = 1
+        weight = 10
+    }
+
+    val otherCategory = OtherCategory(1, 1, "Tigers", parent = animals)
+}
+```
