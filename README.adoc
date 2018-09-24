@@ -40,7 +40,7 @@ dependencies {
 }
 ```
 
-=== Prepare POSOs
+=== Prepare POJOs
 
 Describe your POJO as kotlin interface
 ```kotlin
