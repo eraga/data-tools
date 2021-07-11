@@ -12,4 +12,6 @@ rootProject.name = 'model-processing-tools'
 include ':model-annotations'
 include ':model-processor'
 
-enableFeaturePreview('STABLE_PUBLISHING')
+//enableFeaturePreview('STABLE_PUBLISHING')
+include 'examples-jvm'
+

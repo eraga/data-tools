@@ -18,14 +18,16 @@ make the rest of it:
 === Setup Gradle
 
 Don't forget to add kapt plugin to `build.gradle`:
-```Kotlin
+[source, groovy]
+----
 plugins {
     id 'kotlin-kapt'
 }
-```
+----
 
 Add a custom repository and `model` dependencies:
-```Kotlin
+[source, groovy]
+----
 repositories {
     mavenCentral()
 
@@ -38,24 +40,26 @@ dependencies {
     compileOnly "net.eraga.tools.model:model-annotations:1.0-SNAPSHOT"
     kapt "net.eraga.tools.model:model-processor:1.0-SNAPSHOT"
 }
-```
+----
 
 === Prepare POJOs
 
 Describe your POJO as kotlin interface
-```kotlin
+[source, kotlin]
+----
 @ImplementModel(implSuffix = "Data")
 interface Category {
     val id: Int
     val weight: Int
     val name: String
 }
-```
+----
 
 Run `./gradlew build` and you will get following kapt output in
 your `build/generated` folder:
 
-```Kotlin
+[source, kotlin]
+----
 import java.io.Serializable
 import kotlin.Int
 import kotlin.String
@@ -78,7 +82,7 @@ fun categoryData(init: CategoryData.() -> Unit): Category {
     instance.init()
     return instance
 }
-```
+----
 
 
 === Use it in your project
@@ -87,18 +91,21 @@ fun categoryData(init: CategoryData.() -> Unit): Category {
 
 Example DSL to create an object of `Category` type.
 
-```Kotlin
+[source, kotlin]
+----
 val animals = categoryData {
         name = "Animals"
         id = 1
         weight = 10
     }
-```
+----
+
 ==== Using own and default implementations
 
 
 
-```Kotlin
+[source, kotlin]
+----
 class OtherCategory(
         override val id: Int,
         override val weight: Int,
@@ -115,4 +122,4 @@ fun main(args: Array<String>) {
 
     val otherCategory = OtherCategory(1, 1, "Tigers", parent = animals)
 }
-```
+----
