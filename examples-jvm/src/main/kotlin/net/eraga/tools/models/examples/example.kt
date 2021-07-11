@@ -17,6 +17,7 @@ import net.eraga.tools.models.ClassInitializers
 import net.eraga.tools.models.ClassMapping
 import net.eraga.tools.models.ImplementModel
 import net.eraga.tools.models.Kind
+import java.io.Serializable
 import java.util.*
 
 
@@ -33,11 +34,20 @@ enum class SomeType {
 /**
  * Свойство наличия уникального идентификатора
  */
-interface WithLongId {
+interface WithAnyId {
     /**
      * Уникальный идентификатор
      */
-    val id: Long
+    val id: Any
+}
+
+interface WithStringId : WithAnyId {
+    override val id: String
+}
+
+
+interface WithLongId : WithAnyId {
+    override val id: Long
 }
 
 /**
@@ -55,8 +65,9 @@ interface WithTimeSettings {
  */
 @ImplementModel
 interface EventModel :
-        WithLongId,
-        WithTimeSettings
+    WithLongId,
+//    WithTimeSettings,
+    WithStartEndTimeStamp
 
 interface WithEvents {
     /**
@@ -76,6 +87,25 @@ interface Schedule:
 
     val isType1: Boolean
         get() = type == SomeType.TYPE1
+}
+
+interface WithOptionalStartEndTimeStamp {
+    /**
+     * Время начала (включительно), UNIX Timestamp, миллисекунды
+     */
+    val startTime: Long?
+    /**
+     * Время окончания **(исключительно)**, UNIX Timestamp, миллисекунды
+     */
+    val endTime: Long?
+}
+
+/**
+ * Признак начала/окончания по времени UTC
+ */
+interface WithStartEndTimeStamp : WithOptionalStartEndTimeStamp {
+    override val startTime: Long
+    override val endTime: Long
 }
 
 

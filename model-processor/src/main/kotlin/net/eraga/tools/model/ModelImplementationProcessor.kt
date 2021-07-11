@@ -154,8 +154,8 @@ class ModelImplementationProcessor : AbstractProcessor() {
 //        return getters
 //    }
 
-    private fun gatherProperties(element: TypeElement): Map<ImmutableKmProperty, ExecutableElement> {
-        val getters = HashMap<ImmutableKmProperty, ExecutableElement>()
+    private fun gatherProperties(element: TypeElement): Map<String, Pair<ImmutableKmProperty, ExecutableElement>> {
+        val getters = HashMap<String, Pair<ImmutableKmProperty, ExecutableElement>>()
 
         for (iface in element.interfaces) {
             val realElement = typeUtils.asElement(iface)
@@ -164,6 +164,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
                 getters.putAll(gatherProperties(realElement))
             }
         }
+        println(element.qualifiedName)
         val kmClass = element.toImmutableKmClass()
         kmClass.properties.forEach { property ->
             val getter = element.enclosedElements
@@ -173,7 +174,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
                         .lowercase(Locale.getDefault())
                         .endsWith(property.name.lowercase())
                 }
-            getters[property] = getter
+            getters[property.name] = Pair(property, getter)
         }
 
         return getters
@@ -230,8 +231,9 @@ class ModelImplementationProcessor : AbstractProcessor() {
         val propertySet = HashSet<PropertySpec>()
 
 
-        for ((property, getter) in gatherProperties(element)) {
-            val name = property.name
+        for ((name, pair) in gatherProperties(element)) {
+            val (property, getter) = pair
+//            val name = property.name
             val type = getter.returnType.asTypeName().javaToKotlinType(getter)
 
             val kotlinProperty = PropertySpec.builder(
