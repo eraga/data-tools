@@ -14,7 +14,6 @@
 package net.eraga.tools.models.examples
 
 import net.eraga.tools.models.*
-import java.io.Serializable
 import java.time.LocalDateTime
 import java.util.*
 
@@ -44,10 +43,10 @@ interface WithStringId : WithAnyId {
 }
 
 interface WithUUId : WithAnyId {
-    @property:DefaultConstructor(value = "UUID.randomUUID()")
+    @ConstructorInitializer(value = "UUID.randomUUID()")
     override val id: UUID
 
-    @property:DefaultConstructor(value = "LocalDateTime.now()")
+    @ConstructorInitializer(value = "LocalDateTime.now()")
     val asd: LocalDateTime
 }
 
@@ -73,7 +72,17 @@ interface WithTimeSettings {
 interface EventModel :
     WithUUId,
     WithTimeSettings,
-    WithStartEndTimeStamp
+    WithStartEndTimeStamp,
+    Comparable<EventModel> {
+
+    @PreventOverride
+    val someUtilityCalc: Long
+    get() = startTime + endTime
+
+    override fun compareTo(other: EventModel): Int {
+        throw UnsupportedOperationException("not implemented") //TODO
+    }
+}
 
 interface WithEvents {
     /**
@@ -133,6 +142,12 @@ interface PeriodicalScheduleModel :
         WithPeriod
 
 fun main() {
+    val event = Event()
+    val event2 = Event()
+    if(event > event2) {
+        print("can't be")
+    }
+
     println(mapOf(
             Pair(MutableSet::class, HashSet::class),
             Pair(MutableMap::class, HashMap::class),

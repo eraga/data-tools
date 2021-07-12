@@ -1,0 +1,15 @@
+= Changelog
+
+This document provides a high-level view of the changes introduced in Kotlin Data Model Processor by release.
+For an even more detailed look at what has changed, refer to the {uri-repo}/commits/master[commit history].
+
+This project utilizes semantic versioning.
+
+== 1.1.0 (2021.07.12)
+
+New features and inprovements:
+
+* Support nested inheritance.
+* `ConstructorInitializer` annotation allows to use custom constructor initializers.
+* `PreventOverride` annotation allows to mark certain properties of interface to be excluded from model implementations.
+* Better type handling of kotlin classes.

@@ -4,22 +4,18 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import com.squareup.kotlinpoet.metadata.hasAnnotations
 import com.squareup.kotlinpoet.metadata.specs.ClassInspector
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
-import kotlinx.metadata.KmClassifier
 import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION
 import net.eraga.tools.models.*
 import java.io.File
 import java.io.Serializable
+import java.io.StringWriter
 import java.util.*
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
-import javax.lang.model.element.AnnotationValue
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.TypeElement
+import javax.lang.model.element.*
 import javax.lang.model.type.MirroredTypeException
 import javax.lang.model.type.NoType
 import javax.lang.model.util.Elements
@@ -40,7 +36,6 @@ import kotlin.reflect.full.createInstance
 class ModelImplementationProcessor : AbstractProcessor() {
     companion object {
         const val PROCESSED_ANNOTATION = "net.eraga.tools.models.ImplementModel"
-        const val PROCESSED_ANNOTATION_CONSTRUCTOR = "net.eraga.tools.models.DefaultConstructor"
 
         private fun primitiveInitializersMap(mappings: PrimitiveInitializers?): Map<String, Any?> {
             val defaults = mappings ?: PrimitiveInitializers::class.createInstance()
@@ -144,35 +139,15 @@ class ModelImplementationProcessor : AbstractProcessor() {
         return true
     }
 
-
-//    private fun gatherGetters(element: TypeElement): List<ExecutableElement> {
-//        val getters = ArrayList<ExecutableElement>()
-//
-////        println("$element has superinterfaces: ${element.interfaces}")
-//
-//        for (iface in element.interfaces) {
-//            val realElement = typeUtils.asElement(iface)
-//            if (realElement is TypeElement) {
-//                getters.addAll(gatherGetters(realElement))
-//            } else {
-////                println("realElement is $realElement")
-//            }
-//        }
-//
-//        getters.addAll(element.enclosedElements.filterIsInstance<ExecutableElement>())
-//
-//        return getters
-//    }
-
     class PropertyData(
         val getter: ExecutableElement,
         val typeSpec: ImmutableKmProperty,
-        val defaultInit: String?
+        val defaultInit: String?,
+        val preventOverride: Boolean
     )
 
     private fun gatherProperties(element: TypeElement): Map<String, PropertyData> {
-        val getters = HashMap<String, PropertyData>()
-
+        val getters = LinkedHashMap<String, PropertyData>()
 
         for (iface in element.interfaces) {
             val realElement = typeUtils.asElement(iface)
@@ -182,63 +157,91 @@ class ModelImplementationProcessor : AbstractProcessor() {
             }
         }
 
-//        ClassInspectorUtil.codeLiteralOf("asd")
-
-        val kmClass = element.toImmutableKmClass()
         val metadata = element.getAnnotation(Metadata::class.java)
-        val typeSpec = metadata.toImmutableKmClass().toTypeSpec(
-            ElementsClassInspector.create(processingEnv.elementUtils, processingEnv.typeUtils)
-        )
+        if(metadata == null) {
+            println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
+        } else {
+            val kmClass = metadata.toImmutableKmClass()
+            val typeSpec = kmClass.toTypeSpec(
+                ElementsClassInspector.create(processingEnv.elementUtils, processingEnv.typeUtils)
+            )
 
-        var propertyInitMap: Map<String, String>? = null
+            var propertyInitMap: Map<String, String>? = null
+            var preventOverridesMap: Map<String, Boolean>? = null
 
-        if(typeSpec.kind == TypeSpec.Kind.INTERFACE) {
-            try {
-                val annotatedProps = element
-                    .enclosedElements
-                    .first {
-                        it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
-                    }
-                    .enclosedElements
-                    ?.filter {
-                        it.simpleName.contains("annotations") &&
-                            it.annotationMirrors.any {
-                                    mirror -> mirror.annotationType.asElement().simpleName.toString() == "DefaultConstructor"
-                            }
-                    }
+            val isConstructorInitializer = {mirror: AnnotationMirror ->
+                mirror.annotationType.asElement().simpleName.toString() == ConstructorInitializer::class.java.simpleName}
+            val isPreventOverride = {mirror: AnnotationMirror ->
+                mirror.annotationType.asElement().simpleName.toString() == PreventOverride::class.java.simpleName}
 
-                propertyInitMap = annotatedProps?.associateBy({
-                    it.simpleName.split("$").first()
-                }, {
-                    it.annotationMirrors
+            val annotationFilterPredicate = { mirror: AnnotationMirror ->
+                isPreventOverride(mirror) ||
+                        isConstructorInitializer(mirror)
+            }
+
+            if (typeSpec.kind == TypeSpec.Kind.INTERFACE) {
+                try {
+                    val annotatedProps: List<Element>? = element
+                        .enclosedElements
                         .first {
-                            mirror -> mirror.annotationType.asElement().simpleName.toString() == "DefaultConstructor"
+                            it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
                         }
-                        .elementValues
-                        .values
-                        .first()
-                        .value
-                        .toString()
+                        .enclosedElements
+                        ?.filter {
+                            it.simpleName.contains("annotations") &&
+                                    it.annotationMirrors.any { mirror ->
+                                        annotationFilterPredicate(mirror)
+                                    }
+                        }
 
-                })
+                    propertyInitMap = annotatedProps?.filter {
+                        it.annotationMirrors.any { mirror ->
+                            isConstructorInitializer(mirror)
+                        }
+                    }?.associateBy({
+                        it.simpleName.split("$").first()
+                    }, {
+                        it.annotationMirrors
+                            .first { mirror ->
+                                isConstructorInitializer(mirror)
+                            }
+                            .elementValues
+                            .values
+                            .first()
+                            .value
+                            .toString()
+                    })
 
-            } catch (_: NoSuchElementException) {}
-        }
+                    preventOverridesMap = annotatedProps?.filter {
+                        it.annotationMirrors.any { mirror ->
+                            isPreventOverride(mirror)
+                        }
+                    }?.associateBy({
+                        it.simpleName.split("$").first()
+                    }, {
+                        true
+                    })
+
+                } catch (_: NoSuchElementException) {
+                }
+            }
 //        elementsClassInspector.containerData(ClassInspectorUtil.createClassName(kmClass.name), null)
 //        elementsClassInspector.declarationContainerFor()
 
-        kmClass.properties.forEach { property ->
-            val getter = element.enclosedElements
-                .filterIsInstance<ExecutableElement>().first {
-                    it.returnType !is NoType && it.simpleName.toString()
-                        .lowercase(Locale.getDefault())
-                        .endsWith(property.name.lowercase())
-                }
-            getters[property.name] = PropertyData(
-                getter,
-                property,
-                propertyInitMap?.getOrDefault(getter.simpleName.toString(), null)
-            )
+            kmClass.properties.forEach { property ->
+                val getter = element.enclosedElements
+                    .filterIsInstance<ExecutableElement>().first {
+                        it.returnType !is NoType && it.simpleName.toString()
+                            .lowercase(Locale.getDefault())
+                            .endsWith(property.name.lowercase())
+                    }
+                getters[property.name] = PropertyData(
+                    getter,
+                    property,
+                    propertyInitMap?.getOrDefault(getter.simpleName.toString(), null),
+                    preventOverridesMap?.getOrDefault(getter.simpleName.toString(), null) ?: false
+                )
+            }
         }
 
         return getters
@@ -261,12 +264,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
     @KotlinPoetMetadataPreview
     private fun generateImplementation(element: TypeElement, elements: List<String>) {
 
-        val kmClass = element.toImmutableKmClass()
-
         val metadata = ModelMetadata(element)
-
-        println(kmClass.moduleName)
-        println(metadata.elementPackage)
 
         val superInterfaceClass = ClassName(
             metadata.elementPackage,
@@ -295,6 +293,9 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
 
         for ((name, propertyData) in gatherProperties(element)) {
+            if(propertyData.preventOverride)
+                continue
+
             val defaultInit = propertyData.defaultInit
             val getter = propertyData.getter
             val property = propertyData.typeSpec
@@ -394,7 +395,6 @@ return instance
         }
 
         val file = fileBuilder.build()
-
         file.writeTo(File(kotlinGenerated))
     }
 }

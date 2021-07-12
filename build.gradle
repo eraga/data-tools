@@ -73,8 +73,8 @@ subprojects {
                 artifact sourcesJar
                 artifact javadocJar
                 pom {
-                    name = 'Model Processor'
-                    description = 'Model Processor'
+                    name = 'Kotlin Data Model Processor'
+                    description = 'Kotlin Data Model Processor'
                     url = 'https://github.com/eraga/kotlin-data-tools'
                     licenses {
                         license {
@@ -104,8 +104,8 @@ subprojects {
                     password = nexusPassword
                 }
 
-                def releasesRepoUrl = "http://nexus.eraga.net/content/repositories/public-releases/"
-                def snapshotsRepoUrl = "http://nexus.eraga.net/content/repositories/public-snapshots"
+                def releasesRepoUrl = "https://packages.eraga.net/repository/eraga-public-maven-releases"
+                def snapshotsRepoUrl = "https://packages.eraga.net/repository/eraga-public-maven-unstable"
                 url version.endsWith("SNAPSHOT") ? snapshotsRepoUrl : releasesRepoUrl
             }
         }

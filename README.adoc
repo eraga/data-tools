@@ -32,13 +32,13 @@ repositories {
     mavenCentral()
 
     maven {
-        url 'https://nexus.eraga.net/content/repositories/public-snapshots'
+        url 'https://packages.eraga.net/repository/eraga-public-maven-releases/'
     }
 }
 
 dependencies {
-    compileOnly "net.eraga.tools.model:model-annotations:1.0-SNAPSHOT"
-    kapt "net.eraga.tools.model:model-processor:1.0-SNAPSHOT"
+    compileOnly "net.eraga.tools.model:model-annotations:1.1.0"
+    kapt "net.eraga.tools.model:model-processor:1.1.0"
 }
 ----
 
@@ -102,8 +102,6 @@ val animals = categoryData {
 
 ==== Using own and default implementations
 
-
-
 [source, kotlin]
 ----
 class OtherCategory(
@@ -121,5 +119,33 @@ fun main(args: Array<String>) {
     }
 
     val otherCategory = OtherCategory(1, 1, "Tigers", parent = animals)
+}
+----
+
+==== Custom default constructor initializers
+
+[source, kotlin]
+----
+interface WithAnyId {
+    val id: Any
+}
+
+interface WithStringId : WithAnyId {
+    override val id: String
+}
+
+interface WithUUId : WithAnyId {
+    @ConstructorInitializer(value = "UUID.randomUUID()")
+    override val id: UUID
+
+    @ConstructorInitializer(value = "LocalDateTime.now()")
+    val dateTime: LocalDateTime
+
+    /**
+    * Chosen by fair roll of dice, don't override in implementations
+    */
+    @PreventOverride
+    val randomNumber: Long
+    get() = 4
 }
 ----

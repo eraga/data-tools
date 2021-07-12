@@ -24,17 +24,31 @@ annotation class ImplementModel(
         val serializable: Boolean = true
 )
 
+
+/**
+ * Provides default value initializer of property in default constructor
+ */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.PROPERTY)
-annotation class DefaultConstructor(
+annotation class ConstructorInitializer(
     val value: String
 )
+
+
+/**
+ * Prevents override of annotated property
+ */
+@Retention(AnnotationRetention.SOURCE)
+@Target(AnnotationTarget.PROPERTY)
+annotation class PreventOverride()
+
 
 @Retention(AnnotationRetention.SOURCE)
 annotation class ClassMapping(
         val source: KClass<*>,
         val target: KClass<*>
 )
+
 
 /**
  * Provides default constructor initializers for [ImplementModel] processor
@@ -46,6 +60,7 @@ annotation class ClassMapping(
 annotation class ClassInitializers(
         val list: Array<ClassMapping>
 )
+
 
 /**
  * Provides primitive types initializers for [ImplementModel] processor
