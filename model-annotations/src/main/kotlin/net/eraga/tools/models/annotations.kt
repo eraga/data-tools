@@ -58,7 +58,25 @@ annotation class PrimitiveInitializers(
 
 
 enum class Kind {
-    OPEN, DATA
+    /**
+     * Don't implement default class
+     */
+    NONE,
+
+    /**
+     * Implement open class
+     */
+    OPEN,
+
+    /**
+     * Implement data class
+     */
+    DATA,
+
+    /**
+     * Implement abstract class
+     */
+    ABSTRACT
 }
 
 @Suppress("unused")

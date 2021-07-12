@@ -70,7 +70,7 @@ interface WithTimeSettings {
 /**
  * Part of [Schedule.events]
  */
-@ImplementModel
+@ImplementModel(classKind = Kind.DATA)
 @ImplementComparable(order = ["id", "endTime"])
 interface EventTemplate :
     WithUUId,

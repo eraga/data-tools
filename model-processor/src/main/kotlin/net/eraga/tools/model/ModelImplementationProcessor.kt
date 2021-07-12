@@ -368,17 +368,22 @@ class ModelImplementationProcessor : AbstractProcessor() {
             propertySet.add(kotlinProperty.initializer(name).build())
         }
 
-        val classModifier = if (metadata.modelSettings.classKind == Kind.OPEN) {
-            KModifier.OPEN
-        } else {
-            KModifier.DATA
+        val classModifier = when (metadata.modelSettings.classKind) {
+            Kind.OPEN -> {
+                KModifier.OPEN
+            }
+            Kind.ABSTRACT -> {
+                KModifier.ABSTRACT
+            }
+            Kind.DATA -> {
+                KModifier.DATA
+            }
+            else -> {
+                null
+            }
         }
 
-        classBuilder
-            .addModifiers(classModifier)
-            .addSuperinterface(mutableInterfaceClass)
-            .primaryConstructor(constructorBuilder.build())
-            .addProperties(propertySet)
+
 
         if (metadata.modelSettings.serializable) {
             immutableInterfaceBuilder.addSuperinterface(Serializable::class)
@@ -413,36 +418,46 @@ class ModelImplementationProcessor : AbstractProcessor() {
         val fileBuilder = FileSpec.builder(metadata.elementPackage, metadata.implClassName)
             .addType(immutableInterfaceBuilder.build())
             .addType(mutableInterfaceBuilder.build())
-            .addType(classBuilder.build())
 
+        if(classModifier != null) {
+            classBuilder
+                .addModifiers(classModifier)
+                .addSuperinterface(mutableInterfaceClass)
+                .primaryConstructor(constructorBuilder.build())
+                .addProperties(propertySet)
 
+            fileBuilder
+                .addType(classBuilder.build())
 
-        if (metadata.modelSettings.dsl) {
-            val funBody = CodeBlock.builder()
-                .add(
-                    """
+            if (metadata.modelSettings.dsl && (classModifier == KModifier.DATA || classModifier == KModifier.OPEN)) {
+                val funBody = CodeBlock.builder()
+                    .add(
+                        """
 val instance = %T()
 instance.init()
 return instance
 """.trimStart('\n'), implementationClass
-                )
-                .build()
+                    )
+                    .build()
 
-            val dslFun = FunSpec.builder(metadata.dslFunctionName)
-                .addParameter(
-                    ParameterSpec.builder(
-                        "init",
-                        LambdaTypeName.get(
-                            receiver = implementationClass,
-                            returnType = UNIT
-                        )
-                    ).build()
-                )
-                .addCode(funBody)
-                .returns(superInterfaceClass)
+                val dslFun = FunSpec.builder(metadata.dslFunctionName)
+                    .addParameter(
+                        ParameterSpec.builder(
+                            "init",
+                            LambdaTypeName.get(
+                                receiver = implementationClass,
+                                returnType = UNIT
+                            )
+                        ).build()
+                    )
+                    .addCode(funBody)
+                    .returns(superInterfaceClass)
 
-            fileBuilder.addFunction(dslFun.build())
+                fileBuilder.addFunction(dslFun.build())
+            }
         }
+
+
 
         val file = fileBuilder.build()
         file.writeTo(File(kotlinGenerated))

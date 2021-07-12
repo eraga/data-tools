@@ -10,8 +10,10 @@ This project utilizes semantic versioning.
 New features and improvements:
 
 * New `ImplementModel` annotation argument: `templateSuffix`, defaults to `Template`.
-* Immutable `ObjectModel` interface is noew generated from `ObjectTemplate` interface.
+* Immutable `ObjectModel` interface is now generated from `ObjectTemplate` interface.
 * `Comparable` implementation, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementComparable.kt[ImplementComparable] Annotation
+* Option to completely disable default class generation (and DSL initializer).
+* Option to generate abstract class (with no DSL initializer).
 //* `hashCode` / `equals` implementations, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementHashCode.kt[ImplementHashCode] Annotation and xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementEquals.kt[ImplementEquals] Annotation
 //TODO: * Boilerplate DTO classes
 //TODO: * Boilerplate classes for Spring Controller/Service/Repository in conjunction with DTO
