@@ -25,6 +25,12 @@ annotation class ImplementModel(
 )
 
 @Retention(AnnotationRetention.SOURCE)
+@Target(AnnotationTarget.PROPERTY)
+annotation class DefaultConstructor(
+    val value: String
+)
+
+@Retention(AnnotationRetention.SOURCE)
 annotation class ClassMapping(
         val source: KClass<*>,
         val target: KClass<*>

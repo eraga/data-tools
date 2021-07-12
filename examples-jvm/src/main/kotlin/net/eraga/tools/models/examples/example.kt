@@ -13,11 +13,9 @@
  */
 package net.eraga.tools.models.examples
 
-import net.eraga.tools.models.ClassInitializers
-import net.eraga.tools.models.ClassMapping
-import net.eraga.tools.models.ImplementModel
-import net.eraga.tools.models.Kind
+import net.eraga.tools.models.*
 import java.io.Serializable
+import java.time.LocalDateTime
 import java.util.*
 
 
@@ -45,6 +43,14 @@ interface WithStringId : WithAnyId {
     override val id: String
 }
 
+interface WithUUId : WithAnyId {
+    @property:DefaultConstructor(value = "UUID.randomUUID()")
+    override val id: UUID
+
+    @property:DefaultConstructor(value = "LocalDateTime.now()")
+    val asd: LocalDateTime
+}
+
 
 interface WithLongId : WithAnyId {
     override val id: Long
@@ -65,15 +71,15 @@ interface WithTimeSettings {
  */
 @ImplementModel
 interface EventModel :
-    WithLongId,
-//    WithTimeSettings,
+    WithUUId,
+    WithTimeSettings,
     WithStartEndTimeStamp
 
 interface WithEvents {
     /**
      * Коллекция объявлений
      */
-//    val events: MutableList<EventModel>
+    val events: MutableList<EventModel>
 }
 
 /**

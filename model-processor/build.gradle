@@ -18,6 +18,14 @@ dependencies {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre7'
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre8'
     }
+    implementation ("com.squareup:kotlinpoet-classinspector-elements:1.9.0"){
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre7'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre8'
+    }
+    implementation ("com.squareup:kotlinpoet-classinspector-reflective:1.9.0"){
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre7'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre8'
+    }
     implementation ("com.squareup:kotlinpoet-metadata-specs:1.9.0"){
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre7'
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre8'
