@@ -5,9 +5,21 @@ For an even more detailed look at what has changed, refer to the {uri-repo}/comm
 
 This project utilizes semantic versioning.
 
+== Next version 1.2.0 (TBD)
+
+New features and improvements:
+
+* New `ImplementModel` annotation argument: `templateSuffix`, defaults to `Template`.
+* Immutable `ObjectModel` interface is noew generated from `ObjectTemplate` interface.
+* `Comparable` implementation, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementComparable.kt[ImplementComparable] Annotation
+//* `hashCode` / `equals` implementations, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementHashCode.kt[ImplementHashCode] Annotation and xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementEquals.kt[ImplementEquals] Annotation
+//TODO: * Boilerplate DTO classes
+//TODO: * Boilerplate classes for Spring Controller/Service/Repository in conjunction with DTO
+
+
 == 1.1.0 (2021.07.12)
 
-New features and inprovements:
+New features and improvements:
 
 * Support nested inheritance.
 * `ConstructorInitializer` annotation allows to use custom constructor initializers.

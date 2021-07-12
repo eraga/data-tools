@@ -1,17 +1,18 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.ClassInspector
+import com.squareup.kotlinpoet.metadata.specs.classFor
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION
 import net.eraga.tools.models.*
 import java.io.File
 import java.io.Serializable
-import java.io.StringWriter
 import java.util.*
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
@@ -23,7 +24,7 @@ import javax.lang.model.util.Types
 import javax.tools.Diagnostic
 import kotlin.NoSuchElementException
 import kotlin.collections.HashMap
-import kotlin.collections.HashSet
+import kotlin.collections.LinkedHashSet
 import kotlin.reflect.full.createInstance
 
 /**
@@ -114,7 +115,6 @@ class ModelImplementationProcessor : AbstractProcessor() {
     }
 
 
-
     @KotlinPoetMetadataPreview
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
         val elements = annotations.filter { it.qualifiedName.contentEquals(PROCESSED_ANNOTATION) }
@@ -146,6 +146,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
         val preventOverride: Boolean
     )
 
+
     private fun gatherProperties(element: TypeElement): Map<String, PropertyData> {
         val getters = LinkedHashMap<String, PropertyData>()
 
@@ -158,7 +159,7 @@ class ModelImplementationProcessor : AbstractProcessor() {
         }
 
         val metadata = element.getAnnotation(Metadata::class.java)
-        if(metadata == null) {
+        if (metadata == null) {
             println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
         } else {
             val kmClass = metadata.toImmutableKmClass()
@@ -169,10 +170,12 @@ class ModelImplementationProcessor : AbstractProcessor() {
             var propertyInitMap: Map<String, String>? = null
             var preventOverridesMap: Map<String, Boolean>? = null
 
-            val isConstructorInitializer = {mirror: AnnotationMirror ->
-                mirror.annotationType.asElement().simpleName.toString() == ConstructorInitializer::class.java.simpleName}
-            val isPreventOverride = {mirror: AnnotationMirror ->
-                mirror.annotationType.asElement().simpleName.toString() == PreventOverride::class.java.simpleName}
+            val isConstructorInitializer = { mirror: AnnotationMirror ->
+                mirror.annotationType.asElement().simpleName.toString() == ConstructorInitializer::class.java.simpleName
+            }
+            val isPreventOverride = { mirror: AnnotationMirror ->
+                mirror.annotationType.asElement().simpleName.toString() == PreventOverride::class.java.simpleName
+            }
 
             val annotationFilterPredicate = { mirror: AnnotationMirror ->
                 isPreventOverride(mirror) ||
@@ -250,11 +253,21 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
     class ModelMetadata(element: TypeElement) {
         val modelSettings = element.getAnnotation(ImplementModel::class.java)!!
+        val equalsSettings: ImplementEquals? = element.getAnnotation(ImplementEquals::class.java)
+        val hashCodeSettings: ImplementHashCode? = element.getAnnotation(ImplementHashCode::class.java)
+        val comparableSettings: ImplementComparable? = element.getAnnotation(ImplementComparable::class.java)
+        val comparableInterface = try {
+            element.interfaces.first { it.toString().contains("Comparable") }
+        } catch (_: Exception) {
+            null
+        }
+
         val interfaceClassName = element.simpleName.toString()
-        val baseName = interfaceClassName.removeSuffix(modelSettings.modelSuffix)
+        val baseName = interfaceClassName.removeSuffix(modelSettings.templateSuffix)
         val elementPackage = element.qualifiedName.removeSuffix(".$interfaceClassName").toString()
 
         val mutableInterfaceName = "$baseName${modelSettings.mutableSuffix}"
+        val immutableInterfaceName = "$baseName${modelSettings.immutableSuffix}"
         val implClassName = "$baseName${modelSettings.implSuffix}"
         val dslFunctionName = implClassName.replaceFirstChar { it.lowercase(Locale.getDefault()) }
         val primitiveInitializers = primitiveInitializersMap(element.getAnnotation(PrimitiveInitializers::class.java))
@@ -276,6 +289,11 @@ class ModelImplementationProcessor : AbstractProcessor() {
             metadata.mutableInterfaceName
         )
 
+        val immutableInterfaceClass = ClassName(
+            metadata.elementPackage,
+            metadata.immutableInterfaceName
+        )
+
         val implementationClass = ClassName(
             metadata.elementPackage,
             metadata.implClassName
@@ -283,17 +301,20 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
 
         val mutableInterfaceBuilder = TypeSpec.interfaceBuilder(mutableInterfaceClass)
+            .addSuperinterface(immutableInterfaceClass)
+
+        val immutableInterfaceBuilder = TypeSpec.interfaceBuilder(immutableInterfaceClass)
             .addSuperinterface(superInterfaceClass)
 
         val classBuilder = TypeSpec.classBuilder(implementationClass)
 
         val constructorBuilder = FunSpec.constructorBuilder()
 
-        val propertySet = HashSet<PropertySpec>()
+        val propertySet = LinkedHashSet<PropertySpec>()
 
 
         for ((name, propertyData) in gatherProperties(element)) {
-            if(propertyData.preventOverride)
+            if (propertyData.preventOverride)
                 continue
 
             val defaultInit = propertyData.defaultInit
@@ -308,31 +329,32 @@ class ModelImplementationProcessor : AbstractProcessor() {
                 type,
                 KModifier.OVERRIDE
             )
-                .mutable(true)
 
-            mutableInterfaceBuilder.addProperty(kotlinProperty.build())
+
+            mutableInterfaceBuilder.addProperty(kotlinProperty.mutable(true).build())
+            immutableInterfaceBuilder.addProperty(kotlinProperty.build())
 
             val defaultValue = defaultInit ?: if (type.isNullable) {
-                    "null"
+                "null"
+            } else {
+                val returnType = typeUtils.asElement(getter.returnType)
+                if (returnType?.kind == ElementKind.ENUM) {
+                    "$type.values()[0]"
                 } else {
-                    val returnType = typeUtils.asElement(getter.returnType)
-                    if (returnType?.kind == ElementKind.ENUM) {
-                        "$type.values()[0]"
-                    } else {
-                        val simpleTypeName = type.toString().split(".").last()
+                    val simpleTypeName = type.toString().split(".").last()
 
-                        if (metadata.primitiveInitializers.containsKey(simpleTypeName)) {
-                            metadata.primitiveInitializers[simpleTypeName].toString()
+                    if (metadata.primitiveInitializers.containsKey(simpleTypeName)) {
+                        metadata.primitiveInitializers[simpleTypeName].toString()
+                    } else {
+                        if (elements.contains("$type") && returnType is TypeElement) {
+                            val meta = ModelMetadata(returnType)
+                            "${meta.implClassName}()"
                         } else {
-                            if (elements.contains("$type") && returnType is TypeElement) {
-                                val meta = ModelMetadata(returnType)
-                                "${meta.implClassName}()"
-                            } else {
-                                type.classToInitializer(metadata.classInitializers)
-                            }
+                            type.classToInitializer(metadata.classInitializers)
                         }
                     }
                 }
+            }
 
             constructorBuilder.addParameter(
                 ParameterSpec.builder(
@@ -359,13 +381,41 @@ class ModelImplementationProcessor : AbstractProcessor() {
             .addProperties(propertySet)
 
         if (metadata.modelSettings.serializable) {
-            classBuilder.addSuperinterface(Serializable::class)
+            immutableInterfaceBuilder.addSuperinterface(Serializable::class)
         }
 
+        if (metadata.comparableSettings != null) {
+            val comparableClassName = ClassName.fromKClass(Comparable::class)
+
+            immutableInterfaceBuilder.addSuperinterface(comparableClassName.parameterizedBy(
+                immutableInterfaceClass
+            ))
+
+            val funBodyBuilder = compareToBuilder(immutableInterfaceBuilder.propertySpecs, metadata.comparableSettings)
+
+            val funBody = funBodyBuilder.build()
+
+            val compareToFun = FunSpec.builder("compareTo")
+                .returns(Int::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter(
+                    ParameterSpec.builder(
+                        "other",
+                        immutableInterfaceClass
+                    ).build()
+                )
+                .addCode(funBody)
+
+            immutableInterfaceBuilder
+                .addFunction(compareToFun.build())
+        }
 
         val fileBuilder = FileSpec.builder(metadata.elementPackage, metadata.implClassName)
+            .addType(immutableInterfaceBuilder.build())
             .addType(mutableInterfaceBuilder.build())
             .addType(classBuilder.build())
+
+
 
         if (metadata.modelSettings.dsl) {
             val funBody = CodeBlock.builder()
@@ -397,4 +447,109 @@ return instance
         val file = fileBuilder.build()
         file.writeTo(File(kotlinGenerated))
     }
+
+    private fun compareToBuilder(propertySpecs: MutableList<PropertySpec>, comparableSettings: ImplementComparable): CodeBlock.Builder {
+        val orderedProperties = mutableListOf<PropertySpec>()
+
+        if(comparableSettings.order.isNotEmpty()) {
+            comparableSettings.order.forEach { name ->
+                try {
+                    orderedProperties.add(propertySpecs.first { it.name == name })
+                } catch (e: NoSuchElementException) {
+                    throw NoSuchElementException("Oroperty with name='$name' not found")
+                }
+            }
+
+            if(comparableSettings.compareAllProperties && orderedProperties.size != propertySpecs.size) {
+                propertySpecs.forEach {
+                    if(it.name !in comparableSettings.order)
+                        orderedProperties.add(it)
+                }
+            }
+        } else {
+            orderedProperties.addAll(propertySpecs)
+        }
+
+        val funBodyBuilder = CodeBlock.builder()
+        if (orderedProperties.size > 0) {
+            funBodyBuilder.beginControlFlow("return when")
+            for (prop in orderedProperties) {
+                if (prop.type.implements("Comparable", elementsUtil, typeUtils)) {
+                    funBodyBuilder.addStatement("${prop.name} != other.${prop.name} -> ${prop.name}.compareTo(other.${prop.name})")
+                } else {
+                    funBodyBuilder.addStatement("/*")
+                    funBodyBuilder.addStatement("${prop.name}: ${prop.type} does not inherit comparable")
+                    funBodyBuilder.addStatement("*/")
+                }
+            }
+            funBodyBuilder.addStatement("else -> 0")
+            funBodyBuilder.endControlFlow()
+            funBodyBuilder.addStatement(".toInt()")
+        } else {
+            funBodyBuilder.addStatement("return 0")
+        }
+
+        return funBodyBuilder;
+    }
+}
+
+
+@KotlinPoetMetadataPreview
+private fun TypeName.implementsInJava(name: String, elements: Elements, types: Types): Boolean {
+    try {
+        if (isPrimitiveComparable())
+            return true
+    } catch (e: IllegalArgumentException) {
+    }
+
+    val type = if (isKotlinIntrinsic()) {
+        val javaName = kotlinIntrinsicToJava()
+        if (javaName != null)
+            elements.getTypeElement(javaName)?.asType()
+        else
+            null
+    } else {
+        elements.getTypeElement(toString())?.asType()
+    }
+
+    if (type != null)
+        return types.allSupertypes(type).any {
+            it.toString().contains(name)
+        }
+
+    return false
+}
+
+
+@KotlinPoetMetadataPreview
+private fun TypeName.implements(name: String, elements: Elements, types: Types): Boolean {
+
+    if (implementsInJava(name, elements, types))
+        return true
+
+    val elementsClassInspector = ElementsClassInspector.create(elements, types)
+
+    val km = when (val className = bestGuessParametrized()) {
+        is ClassName -> {
+            if (className.implementsInJava(name, elements, types))
+                return true
+
+            if (!className.isKotlinIntrinsic())
+                elementsClassInspector.classFor(className)
+            else
+                null
+        }
+        is ParameterizedTypeName -> {
+            if (className.rawType.implementsInJava(name, elements, types))
+                return true
+            if (!className.rawType.isKotlinIntrinsic())
+                elementsClassInspector.classFor(className.rawType)
+            else
+                null
+        }
+        else -> {
+            throw IllegalArgumentException("$className must be of instance ClassName or ParameterizedTypeName")
+        }
+    }
+    return km?.supertypes?.any { it.classifier.classString().contains(name) } == true
 }

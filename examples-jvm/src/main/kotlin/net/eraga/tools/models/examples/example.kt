@@ -16,6 +16,7 @@ package net.eraga.tools.models.examples
 import net.eraga.tools.models.*
 import java.time.LocalDateTime
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
 
 
 /**
@@ -59,36 +60,33 @@ interface WithLongId : WithAnyId {
  * Временная настройка, используется в [EventModel.timeSettings]
  */
 @ImplementModel(classKind = Kind.OPEN)
-interface TimeSettingModel
+interface TimeSettingTemplate
+//    : WithAnyId
 
 interface WithTimeSettings {
-    val timeSettings: List<TimeSettingModel>
+    val timeSettings: List<TimeSettingTemplate>
 }
 
 /**
  * Part of [Schedule.events]
  */
 @ImplementModel
-interface EventModel :
+@ImplementComparable(order = ["id", "endTime"])
+interface EventTemplate :
     WithUUId,
     WithTimeSettings,
-    WithStartEndTimeStamp,
-    Comparable<EventModel> {
+    WithStartEndTimeStamp {
 
     @PreventOverride
     val someUtilityCalc: Long
     get() = startTime + endTime
-
-    override fun compareTo(other: EventModel): Int {
-        throw UnsupportedOperationException("not implemented") //TODO
-    }
 }
 
 interface WithEvents {
     /**
      * Коллекция объявлений
      */
-    val events: MutableList<EventModel>
+    val events: MutableList<EventTemplate>
 }
 
 /**
@@ -115,6 +113,7 @@ interface WithOptionalStartEndTimeStamp {
     val endTime: Long?
 }
 
+
 /**
  * Признак начала/окончания по времени UTC
  */
@@ -137,17 +136,29 @@ interface WithPeriod {
 //@CSModelDSLMarker
 @ImplementModel(classKind = Kind.OPEN)
 @ClassInitializers(list = [ClassMapping(source = MutableList::class, target = LinkedList::class)])
-interface PeriodicalScheduleModel :
+interface PeriodicalScheduleTemplate :
         Schedule,
         WithPeriod
 
 fun main() {
+
+    println(ConcurrentLinkedQueue(
+    "kotlin.collections.List<net.eraga.tools.models.examples.TimeSettingTemplate, kotlin.Long>"
+        .split("[\\<\\>\\,]".toRegex())
+        .filter { it.isNotBlank() }
+    ).peek())
+//        .forEach {
+//            println("match: '${it.trim()}'")
+//        }
+
     val event = Event()
     val event2 = Event()
     if(event > event2) {
         print("can't be")
     }
-
+    val time1 = LocalDateTime.now()
+    val time2 = LocalDateTime.now()
+    time1.compareTo(time2)
     println(mapOf(
             Pair(MutableSet::class, HashSet::class),
             Pair(MutableMap::class, HashMap::class),

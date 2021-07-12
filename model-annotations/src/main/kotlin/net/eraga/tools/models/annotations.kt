@@ -3,27 +3,6 @@ package net.eraga.tools.models
 import java.util.*
 import kotlin.reflect.KClass
 
-/**
- * Indicates annotation processor this interface should have a generated implementation
- *
- * @param dsl create dsl function. Defaults to `true`.
- * @param classKind [Kind.DATA] for `data class` implementation or [Kind.OPEN] for `open class` implementation.
- * @param mutableSuffix mutable model interface suffix. Defaults to **MutableModel**
- * @param modelSuffix model interface suffix. Defaults to **Model**.
- * @param implSuffix implementation class suffix. Defaults to empty string (e.g. **""**).
- * @param serializable should be set to `true` if you want generated classes to implement [Serializable].
- */
-@Retention(AnnotationRetention.SOURCE)
-@Target(AnnotationTarget.CLASS)
-annotation class ImplementModel(
-        val dsl: Boolean = true,
-        val classKind: Kind = Kind.DATA,
-        val mutableSuffix: String = "MutableModel",
-        val modelSuffix: String = "Model",
-        val implSuffix: String = "",
-        val serializable: Boolean = true
-)
-
 
 /**
  * Provides default value initializer of property in default constructor
@@ -60,7 +39,6 @@ annotation class ClassMapping(
 annotation class ClassInitializers(
         val list: Array<ClassMapping>
 )
-
 
 /**
  * Provides primitive types initializers for [ImplementModel] processor
