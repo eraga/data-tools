@@ -5,6 +5,12 @@ For an even more detailed look at what has changed, refer to the {uri-repo}/comm
 
 This project utilizes semantic versioning.
 
+== Next version 1.3.0 (TBD)
+
+New features and improvements:
+
+* Nested arrays support
+
 == Next version 1.2.0 (TBD)
 
 New features and improvements:
@@ -14,7 +20,7 @@ New features and improvements:
 * `Comparable` implementation, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementComparable.kt[ImplementComparable] Annotation
 * Option to completely disable default class generation (and DSL initializer).
 * Option to generate abstract class (with no DSL initializer).
-//* `hashCode` / `equals` implementations, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementHashCode.kt[ImplementHashCode] Annotation and xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementEquals.kt[ImplementEquals] Annotation
+* `hashCode` / `equals` implementations, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementHashCode.kt[ImplementHashCode] Annotation and xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementEquals.kt[ImplementEquals] Annotation to overcome xref:https://blog.jetbrains.com/kotlin/2015/09/feedback-request-limitations-on-data-classes/[Limitations on Data Classes]
 //TODO: * Boilerplate DTO classes
 //TODO: * Boilerplate classes for Spring Controller/Service/Repository in conjunction with DTO
 

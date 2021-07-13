@@ -29,21 +29,34 @@ import kotlin.reflect.jvm.internal.impl.name.FqName
 //    return classFor(className)
 //}
 
+public val KOTLIN_ARRAY_INTERFACES: Set<ClassName> = setOf(
+    ARRAY,
+    BOOLEAN_ARRAY,
+    BYTE_ARRAY,
+    CHAR_ARRAY,
+    SHORT_ARRAY,
+    INT_ARRAY,
+    LONG_ARRAY,
+    FLOAT_ARRAY,
+    DOUBLE_ARRAY
+)
+
 fun ClassName.Companion.fromKClass(kclass: KClass<*>): ClassName {
     return ClassName.bestGuess(kclass.qualifiedName!!)
 }
 
 @KotlinPoetMetadataPreview
-fun TypeName.isKotlinIntrinsic(): Boolean {
+fun ClassName.isKotlinIntrinsic(): Boolean {
     return try {
-        ClassName.bestGuess(toString()) in ClassInspectorUtil.KOTLIN_INTRINSIC_INTERFACES
+        this in ClassInspectorUtil.KOTLIN_INTRINSIC_INTERFACES
     } catch (e: IllegalArgumentException) {
+        println(e.message)
         false
     }
 }
 
-fun TypeName.kotlinIntrinsicToJava(): String? {
-    return JavaToKotlinClassMap.INSTANCE.mapKotlinToJava(FqName(toString()).toUnsafe())
+fun ClassName.kotlinIntrinsicToJava(): String? {
+    return JavaToKotlinClassMap.INSTANCE.mapKotlinToJava(FqName(canonicalName).toUnsafe())
             ?.asSingleFqName()
             ?.asString()
 }
@@ -129,9 +142,9 @@ fun Types.allSupertypes(t: TypeMirror): List<TypeMirror> {
     return result
 }
 
-fun TypeName.isPrimitiveComparable(): Boolean {
-    return when(ClassName.bestGuess(this.toString())) {
-//        UNIT -> java.lang.Void.TYPE
+fun ClassName.isPrimitiveComparable(): Boolean {
+    return when(this) {
+        UNIT -> false
         BOOLEAN -> true
         BYTE -> true
         SHORT -> true

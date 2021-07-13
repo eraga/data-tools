@@ -392,11 +392,14 @@ class ModelImplementationProcessor : AbstractProcessor() {
         if (metadata.comparableSettings != null) {
             val comparableClassName = ClassName.fromKClass(Comparable::class)
 
-            immutableInterfaceBuilder.addSuperinterface(comparableClassName.parameterizedBy(
-                immutableInterfaceClass
-            ))
+            immutableInterfaceBuilder.addSuperinterface(
+                comparableClassName.parameterizedBy(
+                    immutableInterfaceClass
+                )
+            )
 
-            val funBodyBuilder = compareToBuilder(immutableInterfaceBuilder.propertySpecs, metadata.comparableSettings)
+            val funBodyBuilder =
+                funCompareToBuilder(immutableInterfaceBuilder.propertySpecs, metadata.comparableSettings)
 
             val funBody = funBodyBuilder.build()
 
@@ -415,16 +418,51 @@ class ModelImplementationProcessor : AbstractProcessor() {
                 .addFunction(compareToFun.build())
         }
 
+
         val fileBuilder = FileSpec.builder(metadata.elementPackage, metadata.implClassName)
             .addType(immutableInterfaceBuilder.build())
             .addType(mutableInterfaceBuilder.build())
 
-        if(classModifier != null) {
+        if (classModifier != null) {
             classBuilder
                 .addModifiers(classModifier)
                 .addSuperinterface(mutableInterfaceClass)
                 .primaryConstructor(constructorBuilder.build())
                 .addProperties(propertySet)
+
+            if (metadata.hashCodeSettings != null) {
+                val funBodyBuilder = funHashCodeBuilder(classBuilder.propertySpecs, metadata.hashCodeSettings)
+                val funBody = funBodyBuilder.build()
+
+                val compareToFun = FunSpec.builder("hashCode")
+                    .returns(Int::class)
+                    .addModifiers(KModifier.OVERRIDE)
+                    .addCode(funBody)
+
+                classBuilder
+                    .addFunction(compareToFun.build())
+            }
+
+            if (metadata.equalsSettings != null) {
+                val funBodyBuilder = funEqualsBuilder(
+                    classBuilder.propertySpecs,
+                    metadata.implClassName,
+                    metadata.equalsSettings
+                )
+                val funBody = funBodyBuilder.build()
+
+                val compareToFun = FunSpec.builder("equals")
+                    .returns(Boolean::class)
+                    .addParameter(
+                        "other",
+                        Any::class.asTypeName().copy(nullable = true)
+                    )
+                    .addModifiers(KModifier.OVERRIDE)
+                    .addCode(funBody)
+
+                classBuilder
+                    .addFunction(compareToFun.build())
+            }
 
             fileBuilder
                 .addType(classBuilder.build())
@@ -458,26 +496,28 @@ return instance
         }
 
 
-
         val file = fileBuilder.build()
         file.writeTo(File(kotlinGenerated))
     }
 
-    private fun compareToBuilder(propertySpecs: MutableList<PropertySpec>, comparableSettings: ImplementComparable): CodeBlock.Builder {
+    private fun funCompareToBuilder(
+        propertySpecs: MutableList<PropertySpec>,
+        comparableSettings: ImplementComparable
+    ): CodeBlock.Builder {
         val orderedProperties = mutableListOf<PropertySpec>()
 
-        if(comparableSettings.order.isNotEmpty()) {
+        if (comparableSettings.order.isNotEmpty()) {
             comparableSettings.order.forEach { name ->
                 try {
                     orderedProperties.add(propertySpecs.first { it.name == name })
                 } catch (e: NoSuchElementException) {
-                    throw NoSuchElementException("Oroperty with name='$name' not found")
+                    throw NoSuchElementException("Property with name='$name' not found")
                 }
             }
 
-            if(comparableSettings.compareAllProperties && orderedProperties.size != propertySpecs.size) {
+            if (comparableSettings.compareAllProperties && orderedProperties.size != propertySpecs.size) {
                 propertySpecs.forEach {
-                    if(it.name !in comparableSettings.order)
+                    if (it.name !in comparableSettings.order)
                         orderedProperties.add(it)
                 }
             }
@@ -489,30 +529,98 @@ return instance
         if (orderedProperties.size > 0) {
             funBodyBuilder.beginControlFlow("return when")
             for (prop in orderedProperties) {
-                if (prop.type.implements("Comparable", elementsUtil, typeUtils)) {
-                    funBodyBuilder.addStatement("${prop.name} != other.${prop.name} -> ${prop.name}.compareTo(other.${prop.name})")
+                if (prop.type.asClassName().implements("Comparable", elementsUtil, typeUtils)) {
+                    funBodyBuilder.add("${prop.name} != other.${prop.name} -> ${prop.name}.compareTo(other.${prop.name})\n")
                 } else {
-                    funBodyBuilder.addStatement("/*")
-                    funBodyBuilder.addStatement("${prop.name}: ${prop.type} does not inherit comparable")
-                    funBodyBuilder.addStatement("*/")
+                    funBodyBuilder.add("/*\n")
+                    funBodyBuilder.add("${prop.name}: ${prop.type} does not inherit comparable\n")
+                    funBodyBuilder.add("*/\n")
                 }
             }
-            funBodyBuilder.addStatement("else -> 0")
+            funBodyBuilder.add("else -> 0\n")
             funBodyBuilder.endControlFlow()
-            funBodyBuilder.addStatement(".toInt()")
+            funBodyBuilder.add(".toInt()\n")
         } else {
-            funBodyBuilder.addStatement("return 0")
+            funBodyBuilder.add("return 0\n")
         }
+
+        return funBodyBuilder;
+    }
+
+    private fun funHashCodeBuilder(
+        propertySpecs: MutableList<PropertySpec>,
+        hashCodeSettings: ImplementHashCode
+    ): CodeBlock.Builder {
+        val funBodyBuilder = CodeBlock.builder()
+        funBodyBuilder.add("var hashCode = 0\n")
+        if (propertySpecs.size > 0) {
+            for (prop in propertySpecs) {
+                val isArray = prop.type.asClassName().isArray()
+                if (isArray && hashCodeSettings.arrayComparing == ArrayComparing.STRUCTURAL)
+                    funBodyBuilder.add("hashCode = 31 * hashCode + %L.contentHashCode()\n", prop.name)
+                else if (isArray && hashCodeSettings.arrayComparing == ArrayComparing.STRUCTURAL_RECURSIVE)
+                    funBodyBuilder.add("hashCode = 31 * hashCode + %L.contentDeepHashCode()\n", prop.name)
+                else
+                    funBodyBuilder.add("hashCode = 31 * hashCode + %L.hashCode()\n", prop.name)
+            }
+        }
+        funBodyBuilder.add("return hashCode\n")
+
+        return funBodyBuilder;
+    }
+
+    private fun funEqualsBuilder(
+        propertySpecs: MutableList<PropertySpec>,
+        className: String,
+        equalsSettings: ImplementEquals
+    ): CodeBlock.Builder {
+        val funBodyBuilder = CodeBlock.builder()
+        funBodyBuilder.add(
+            """
+            |if (this === other) return true
+            |if (other !is ${className}) return false
+            |""".trimMargin()
+        )
+        funBodyBuilder.add("\n")
+        if (propertySpecs.size > 0) {
+//            val contentDeepEquals = MemberName("kotlin.collections","contentDeepEquals")
+            for (prop in propertySpecs) {
+                val isArray = prop.type.asClassName().isArray()
+                if (isArray && equalsSettings.arrayComparing == ArrayComparing.STRUCTURAL)
+                    funBodyBuilder.add("if (!%L.contentEquals(other.%L)) return false\n", prop.name, prop.name)
+                else if (isArray && equalsSettings.arrayComparing == ArrayComparing.STRUCTURAL_RECURSIVE)
+                    funBodyBuilder.add("if (!%L.contentDeepEquals(other.%L)) return false\n", prop.name, prop.name)
+                else
+                    funBodyBuilder.add("if (%L != other.%L) return false\n", prop.name, prop.name)
+            }
+        }
+        funBodyBuilder.add("return true\n")
 
         return funBodyBuilder;
     }
 }
 
+private fun TypeName.asClassName(): ClassName {
+    if (this is ClassName) {
+        return this
+    } else if (this is ParameterizedTypeName) {
+        return this.rawType
+    }
+    throw IllegalArgumentException("$this is not ClassName")
+}
+
+private fun ClassName.isArray(): Boolean {
+    if (canonicalName.contains("Array")) {
+        println(canonicalName)
+        return true
+    }
+    return false
+}
 
 @KotlinPoetMetadataPreview
-private fun TypeName.implementsInJava(name: String, elements: Elements, types: Types): Boolean {
+private fun ClassName.implementsInJava(name: String, elements: Elements, types: Types): Boolean {
     try {
-        if (isPrimitiveComparable())
+        if (name.contains("Comparable") and isPrimitiveComparable())
             return true
     } catch (e: IllegalArgumentException) {
     }
@@ -524,7 +632,7 @@ private fun TypeName.implementsInJava(name: String, elements: Elements, types: T
         else
             null
     } else {
-        elements.getTypeElement(toString())?.asType()
+        elements.getTypeElement(canonicalName)?.asType()
     }
 
     if (type != null)
@@ -537,7 +645,9 @@ private fun TypeName.implementsInJava(name: String, elements: Elements, types: T
 
 
 @KotlinPoetMetadataPreview
-private fun TypeName.implements(name: String, elements: Elements, types: Types): Boolean {
+private fun ClassName.implements(name: String, elements: Elements, types: Types): Boolean {
+    if (this in KOTLIN_ARRAY_INTERFACES)
+        return false
 
     if (implementsInJava(name, elements, types))
         return true
@@ -546,6 +656,7 @@ private fun TypeName.implements(name: String, elements: Elements, types: Types):
 
     val km = when (val className = bestGuessParametrized()) {
         is ClassName -> {
+
             if (className.implementsInJava(name, elements, types))
                 return true
 
