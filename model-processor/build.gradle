@@ -32,7 +32,7 @@ dependencies {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jre8'
     }
 
-    compile 'com.github.ntrrgc:ts-generator:1.1.1'
+    implementation 'com.github.ntrrgc:ts-generator:1.1.1'
 
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }

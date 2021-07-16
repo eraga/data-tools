@@ -25,6 +25,8 @@ import javax.lang.model.util.Types
  */
 @KotlinPoetMetadataPreview
 object ProcessingContext {
+    lateinit var implementedModels: MutableList<ModelGenerator>
+
     lateinit var classInspector: ClassInspector
         private set
 

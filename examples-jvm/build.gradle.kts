@@ -17,11 +17,11 @@ repositories {
 val typeScriptGenerated = "$buildDir/generated/source/kaptTypeScript/main"
 //val typeScriptGenerated = "$buildDir/publications/npm/${project.name}"
 
-kapt {
-    arguments {
-        arg("kapt.typescript.generated", typeScriptGenerated)
-    }
-}
+//kapt {
+//    arguments {
+//        arg("kapt.typescript.generated", typeScriptGenerated)
+//    }
+//}
 
 //kotlin {
 //    js(IR) {
@@ -33,14 +33,14 @@ kapt {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.eclipse.persistence:javax.persistence:2.2.1")
 
     compileOnly(project(":model-annotations"))
     kapt(project (":model-processor"))
 
 
-    implementation("org.eclipse.persistence:javax.persistence:2.2.1")
-
-
+    testCompileOnly(project(":model-annotations"))
+    kaptTest(project (":model-processor"))
     testImplementation(group = "junit", name = "junit", version = "4.12")
 }
 

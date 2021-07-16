@@ -5,16 +5,6 @@ import kotlin.reflect.KClass
 
 
 /**
- * Provides default value initializer of property in default constructor
- */
-@Retention(AnnotationRetention.SOURCE)
-@Target(AnnotationTarget.PROPERTY)
-annotation class ConstructorInitializer(
-    val value: String
-)
-
-
-/**
  * Prevents override of annotated property
  */
 @Retention(AnnotationRetention.SOURCE)

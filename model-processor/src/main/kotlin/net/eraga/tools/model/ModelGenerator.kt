@@ -3,21 +3,18 @@ package net.eraga.tools.model
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.*
-import com.squareup.kotlinpoet.metadata.specs.ClassData
-import com.squareup.kotlinpoet.metadata.specs.internal.ClassInspectorUtil
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
-import net.eraga.tools.model.typescript.ClassNameSpec
-import net.eraga.tools.model.typescript.TypeScriptGenerator
+import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.ImplementModel
 import net.eraga.tools.models.ClassKind
+import net.eraga.tools.models.GeneratedClass
 import java.io.File
-import java.io.FileWriter
 import java.io.Serializable
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.util.*
+import javax.lang.model.element.AnnotationMirror
+import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.TypeElement
+import kotlin.NoSuchElementException
 import kotlin.collections.LinkedHashSet
 
 /**
@@ -39,50 +36,49 @@ class ModelGenerator(
         element: TypeElement,
         allElements: List<String>,
         kotlinGenerated: String,
-        private val implementModel: ImplementModel)
+        val implementModel: ImplementModel)
     : AbstractGenerator(element, allElements, kotlinGenerated) {
+    val metadata = ModelMetadata(element, implementModel)
 
-    override fun generate() {
-        val metadata = ModelMetadata(element, implementModel)
+    val templateInterfaceClass = if (metadata.modelSettings.inheritTemplate)
+        ClassName(
+                metadata.elementPackage,
+                metadata.interfaceClassName
+        )
+    else
+        null
 
-        val templateInterfaceClass = if (metadata.modelSettings.inheritTemplate)
-            ClassName(
-                    metadata.elementPackage,
-                    metadata.interfaceClassName
-            )
-        else
-            null
+    val immutableInterfaceClass = if (metadata.modelSettings.immutable.classKind == ClassKind.INTERFACE)
+        ClassName(
+                metadata.elementPackage,
+                metadata.immutableInterfaceName
+        )
+    else
+        null
 
-        val immutableInterfaceClass = if (metadata.modelSettings.immutable.classKind == ClassKind.INTERFACE)
-            ClassName(
-                    metadata.elementPackage,
-                    metadata.immutableInterfaceName
-            )
-        else
-            null
-
-        val mutableInterfaceClass =  if (metadata.modelSettings.immutable.classKind == ClassKind.INTERFACE)
-            ClassName(
+    val mutableInterfaceClass =  if (metadata.modelSettings.mutable.classKind == ClassKind.INTERFACE)
+        ClassName(
                 metadata.elementPackage,
                 metadata.mutableInterfaceName
         )
-        else
-            null
+    else
+        null
 
-        val implementationClass = if (metadata.modelSettings.kclass.classKind > ClassKind.INTERFACE) {
-            ClassName(
-                    metadata.elementPackage,
-                    metadata.implClassName
-            )
-        } else
-            null
+    val implementationClass = if (metadata.modelSettings.kclass.classKind > ClassKind.INTERFACE) {
+        ClassName(
+                metadata.elementPackage,
+                metadata.implClassName
+        )
+    } else
+        null
 
-        fun getLastFromInheritanceChain(): ClassName? {
-            if(!metadata.modelSettings.inheritTemplate)
-                return immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
-            return templateInterfaceClass ?: immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
-        }
+    fun getLastFromInheritanceChain(inheritTemplate: Boolean = metadata.modelSettings.inheritTemplate): ClassName? {
+        if(!inheritTemplate)
+            return immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
+        return templateInterfaceClass ?: immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
+    }
 
+    override fun generate() {
         /**
          * All implementations were disabled, skip generation
          */
@@ -90,18 +86,19 @@ class ModelGenerator(
             return
 
 
-        val mutableInterfaceBuilder = if (mutableInterfaceClass != null) {
-            val builder = TypeSpec.interfaceBuilder(mutableInterfaceClass)
-            if ((immutableInterfaceClass ?: templateInterfaceClass) != null)
-                builder.addSuperinterface(immutableInterfaceClass ?: templateInterfaceClass!!)
-            builder
-        } else
-            null
 
         val immutableInterfaceBuilder = if (immutableInterfaceClass != null) {
             val builder = TypeSpec.interfaceBuilder(immutableInterfaceClass)
             if (templateInterfaceClass != null)
                 builder.addSuperinterface(templateInterfaceClass)
+            builder
+        } else
+            null
+
+        val mutableInterfaceBuilder = if (mutableInterfaceClass != null) {
+            val builder = TypeSpec.interfaceBuilder(mutableInterfaceClass)
+            if ((immutableInterfaceClass ?: templateInterfaceClass) != null)
+                builder.addSuperinterface(immutableInterfaceClass ?: templateInterfaceClass!!)
             builder
         } else
             null
@@ -119,21 +116,18 @@ class ModelGenerator(
             return immutableInterfaceBuilder ?: mutableInterfaceBuilder ?: classBuilder!!
         }
 
+        /**
+         * We annotate only kotlin sources, so this can't be null
+         */
+        val kmClass = element.getAnnotation(Metadata::class.java)?.toImmutableKmClass()!!
+        val kmClassSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
+
         if(!metadata.modelSettings.inheritTemplate) {
-            val kmClass = element.getAnnotation(Metadata::class.java)?.toImmutableKmClass()
-            if (kmClass == null) {
-                element.interfaces.forEach {
-                    builderFromInheritanceChain().addSuperinterface(it.asTypeName())
-                }
-            } else {
-                val templateSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
-                templateSpec.superinterfaces.keys.forEach {
-                    builderFromInheritanceChain().addSuperinterface(it)
-                }
-                if(implementationClass != null)
-                    classNameSpec = kmClass
-//                builderFromInheritanceChain().addSuperinterface(ClassInspectorUtil.createClassName(kmClass.name))
+            kmClassSpec.superinterfaces.keys.forEach {
+                builderFromInheritanceChain().addSuperinterface(it)
             }
+            if(implementationClass != null)
+                classNameSpec = kmClass
         }
 
 
@@ -145,11 +139,65 @@ class ModelGenerator(
                 continue
 
             val defaultInit = propertyData.defaultInit
-            val getter = propertyData.getter
+//            val getter = propertyData.getter
             val property = propertyData.typeSpec
 
 //            val type = getter.returnType.asTypeName().javaToKotlinType(getter)
-            val type = propertyData.propertySpec.type
+            val type = if(propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
+//                propertyData.typeSpec.syntheticMethodForAnnotations
+//                val generatedClass = getter.getAnnotation(GeneratedClass::class.java)
+                val isConstructorInitializer = { mirror: AnnotationMirror ->
+                    mirror.annotationType.asElement().simpleName.toString() == GeneratedClass::class.java.simpleName
+                }
+                val annotatedProps: List<Element>? = element
+                        .enclosedElements
+                        .first {
+                            it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
+                        }
+                        .enclosedElements
+                        ?.filter {
+                            it.simpleName.contains("annotations") &&
+                                    it.annotationMirrors.any { mirror ->
+                                        isConstructorInitializer(mirror)
+                                    }
+                        }
+
+
+                val propertyInitMap = annotatedProps?.filter {
+                    it.annotationMirrors.any { mirror ->
+                        isConstructorInitializer(mirror)
+                    }
+                }?.associateBy({
+                    it.simpleName.split("$").first()
+                }, {
+                    it.annotationMirrors
+                            .first { mirror ->
+                                isConstructorInitializer(mirror)
+                            }
+                            .elementValues
+                            .values
+                            .first()
+                            .value
+                            .toString()
+                })
+
+                if(propertyInitMap!!.values.first().isNotBlank())
+                    ClassName.bestGuess(propertyInitMap.values.first())
+                else
+                    propertyData.propertySpec.type
+            } else {
+                try {
+                    ProcessingContext.implementedModels
+                            .first { it.metadata.templateClassName == propertyData.propertySpec.type }
+                            .getLastFromInheritanceChain()!!
+                } catch (_: NoSuchElementException) {
+                    propertyData.propertySpec.type
+                }
+            }
+
+            if(type.toString().contains("NonExistentClass")) {
+                println("Non xistent !! $type")
+            }
 
             val kotlinProperty = PropertySpec.builder(
                     name,
@@ -175,20 +223,32 @@ class ModelGenerator(
             val defaultValue = defaultInit ?: if (type.isNullable) {
                 "null"
             } else {
-                val returnType = ProcessingContext.types.asElement(getter.returnType)
-                if (returnType?.kind == ElementKind.ENUM) {
-                    "$type.values()[0]"
+                val returnTypeSpec = propertyData.propertySpec.type.asTypeSpec()
+                if (returnTypeSpec.isEnum) {
+                    try {
+                        "${returnTypeSpec.name}.${returnTypeSpec.enumConstants.keys.first()}"
+                    } catch (e: NoSuchElementException) {
+                        "$type.values()[0]"
+                    }
                 } else {
                     val simpleTypeName = type.toString().split(".").last()
 
                     if (metadata.primitiveInitializers.containsKey(simpleTypeName)) {
                         metadata.primitiveInitializers[simpleTypeName].toString()
                     } else {
-                        if (elements.contains("$type") && returnType is TypeElement) {
-                            val meta = ModelMetadata(returnType, implementModel)
+                        try {
+                            val typeModel = ProcessingContext.implementedModels.first {
+                                it.getLastFromInheritanceChain() == type
+                            }
+                            val meta = typeModel.metadata
                             "${meta.implClassName}()"
-                        } else {
-                            type.classToInitializer(metadata.classInitializers)
+                        } catch(e: NoSuchElementException) {
+                            val initlzr = type.classToInitializer(metadata.classInitializers)
+                            if(initlzr.contains("NonExistentClass")) {
+                                println("$initlzr == $type")
+                                type.toString()
+                            }
+                            initlzr
                         }
                     }
                 }
@@ -236,7 +296,7 @@ class ModelGenerator(
 
             builderFromInheritanceChain().addSuperinterface(
                     comparableClassName.parameterizedBy(
-                            getLastFromInheritanceChain()!!
+                            getLastFromInheritanceChain(inheritTemplate = false)!!
                     )
             )
 
@@ -251,7 +311,7 @@ class ModelGenerator(
                     .addParameter(
                             ParameterSpec.builder(
                                     "other",
-                                    getLastFromInheritanceChain()!!
+                                    getLastFromInheritanceChain(inheritTemplate = false)!!
                             ).build()
                     )
                     .addCode(funBody)
@@ -337,11 +397,6 @@ return instance
                 fileBuilder.addFunction(dslFun.build())
             }
         }
-
-//        if(classBuilder != null && implementationClass != null) {
-//            classNameSpec = implementationClass
-//            ProcessingContext.registerTypeSpec(implementationClass, classBuilder.build())
-//        }
 
         val file = fileBuilder.build()
         file.writeTo(File(kotlinGenerated))

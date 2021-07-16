@@ -1,16 +1,12 @@
 package net.eraga.tools.model
 
-import com.squareup.kotlinpoet.CodeBlock
-import com.squareup.kotlinpoet.DelicateKotlinPoetApi
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.models.*
 import java.util.*
 import javax.lang.model.element.*
-import javax.lang.model.type.NoType
 import javax.lang.model.type.TypeKind
 import kotlin.NoSuchElementException
 
@@ -66,7 +62,6 @@ abstract class AbstractGenerator(
         }
 
 
-
         val kmClass = metadata.toImmutableKmClass()
         val typeSpec = kmClass.toTypeSpec(
                 ProcessingContext.classInspector
@@ -102,6 +97,7 @@ abstract class AbstractGenerator(
                                     }
                         }
 
+
                 propertyInitMap = annotatedProps?.filter {
                     it.annotationMirrors.any { mirror ->
                         isConstructorInitializer(mirror)
@@ -120,6 +116,7 @@ abstract class AbstractGenerator(
                             .toString()
                 })
 
+
                 preventOverridesMap = annotatedProps?.filter {
                     it.annotationMirrors.any { mirror ->
                         isPreventOverride(mirror)
@@ -136,7 +133,12 @@ abstract class AbstractGenerator(
 
         val propNames = kmClass.properties.map { it.name }
         val findPropByName = { name: String ->
-            kmClass.properties.first{ it.name == name }
+            try {
+                kmClass.properties.first { it.name == name }
+            } catch (e: Exception) {
+                throw IllegalStateException("Caught Exception when iterating ${kmClass.properties.map { it.name }} " +
+                        "and searching '$name' in class ${element.qualifiedName}", e)
+            }
         }
         val findPropName = { ele: ExecutableElement ->
             propNames.first {
@@ -149,8 +151,16 @@ abstract class AbstractGenerator(
 
         element.enclosedElements
                 .filterIsInstance<ExecutableElement>()
-                .filter { onlyGetter(it, findPropName(it)) }
 //                .associateBy(findPropName)
+                .filter {
+                    try {
+                        findPropName(it)
+                        true
+                    } catch (e: NoSuchElementException) {
+                        false
+                    }
+                }
+                .filter { onlyGetter(it, findPropName(it)) }
                 .forEach { getter ->
                     val propName = findPropName(getter)
                     getters[propName] = PropertyData(
@@ -164,27 +174,7 @@ abstract class AbstractGenerator(
 //                    println("$level: ${it.simpleName} (${it.kind})")
                 }
 
-//        kmClass.properties.forEach { property ->
-//            val getter = element.enclosedElements
-//                    .filterIsInstance<ExecutableElement>().first {
-//                        it.returnType !is NoType && it.simpleName.toString()
-//                                .lowercase(Locale.getDefault())
-//                                .endsWith(property.name.lowercase())
-//                    }
-//
-//            getters[property.name] = PropertyData(
-//                    getter,
-//                    property,
-//                    propertyInitMap?.getOrDefault(getter.simpleName.toString(), null),
-//                    preventOverridesMap?.getOrDefault(getter.simpleName.toString(), null) ?: false,
-//                    level > 0
-//            )
-//        }
-
-
-
-
-        getters.forEach { (k, v) -> println("$level: $k") }
+//        getters.forEach { (k, _) -> println("$level: $k") }
         return getters
     }
 
@@ -193,19 +183,23 @@ abstract class AbstractGenerator(
             comparableSettings: ImplementComparable
     ): CodeBlock.Builder {
         val orderedProperties = mutableListOf<PropertySpec>()
-
+        fun String.withoutMinus(): String {
+            return replace("-", "")
+        }
         if (comparableSettings.order.isNotEmpty()) {
             comparableSettings.order.forEach { name ->
                 try {
-                    orderedProperties.add(propertySpecs.first { it.name == name })
+                    orderedProperties.add(propertySpecs.first { it.name == name.withoutMinus() })
                 } catch (e: NoSuchElementException) {
-                    throw NoSuchElementException("Property with name='$name' not found")
+                    throw NoSuchElementException("Property with name='$name' not found in $propertySpecs " +
+                            "for class ${element.simpleName}")
                 }
             }
+            val orderWithoutMinus = comparableSettings.order.map { it.withoutMinus() }
 
             if (comparableSettings.compareAllProperties && orderedProperties.size != propertySpecs.size) {
                 propertySpecs.forEach {
-                    if (it.name !in comparableSettings.order)
+                    if (it.name !in orderWithoutMinus)
                         orderedProperties.add(it)
                 }
             }
@@ -218,10 +212,11 @@ abstract class AbstractGenerator(
             funBodyBuilder.beginControlFlow("return when")
             for (prop in orderedProperties) {
                 if (prop.type.copy(nullable = false).asClassName().implements("Comparable")) {
+                    val minus = if (comparableSettings.order.contains("-${prop.name}")) "-" else ""
                     if (!prop.type.isNullable)
-                        funBodyBuilder.add("${prop.name} != other.${prop.name} -> ${prop.name}.compareTo(other.${prop.name})\n")
+                        funBodyBuilder.add("${prop.name} != other.${prop.name} -> $minus${prop.name}.compareTo(other.${prop.name})\n")
                     else
-                        funBodyBuilder.add("${prop.name} != other.${prop.name} -> compareValues(${prop.name}, other.${prop.name})\n")
+                        funBodyBuilder.add("${prop.name} != other.${prop.name} -> ${minus}compareValues(${prop.name}, other.${prop.name})\n")
                 } else {
                     funBodyBuilder.add("/*\n")
                     funBodyBuilder.add("${prop.name}: ${prop.type} does not inherit comparable\n")

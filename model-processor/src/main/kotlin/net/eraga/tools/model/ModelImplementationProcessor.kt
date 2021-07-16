@@ -1,8 +1,6 @@
 package net.eraga.tools.model
 
-import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.DelicateKotlinPoetApi
-import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
@@ -81,11 +79,16 @@ class ModelImplementationProcessor : AbstractProcessor() {
             it.getAnnotation(Implementations::class.java).value.forEach(::println)
         }
 
-        val modelElements = roundEnv.getElementsAnnotatedWith(Implementations::class.java).associateBy({ it as TypeElement }, {
+        val modelElements = roundEnv.getElementsAnnotatedWith(Implementations::class.java)
+                .associateBy({ it as TypeElement }, {
             it.getAnnotation(Implementations::class.java).value
         })
 
-        val implementedModels = mutableListOf<ModelGenerator>()
+        ProcessingContext.implementedModels = mutableListOf<ModelGenerator>()
+
+        /**
+         * Collect information about all models that we are about to implement
+         */
 
         val elements = annotations
                 .filter { it.qualifiedName.toString() in PROCESSED_ANNOTATIONS }
@@ -95,13 +98,13 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
         modelElements.forEach { (typeElement, implementations) ->
             implementations.forEach { settings ->
-                implementedModels.add(
+                ProcessingContext.implementedModels.add(
                         ModelGenerator(
                                 typeElement,
                                 elements.map { it.qualifiedName.toString() },
                                 kotlinGenerated,
                                 implementModel = settings
-                        ).apply { run() })
+                        ))
             }
         }
 
@@ -113,17 +116,17 @@ class ModelImplementationProcessor : AbstractProcessor() {
                 val implementDTO = typeElement.getAnnotation(ImplementDTO::class.java)
                 val implementModel = typeElement.getAnnotation(ImplementModel::class.java)
                 if (typeElement.kind.isInterface) {
-                    if (implementDTO != null) {
-                        DTOGenerator(typeElement, elements.map { it.qualifiedName.toString() }, kotlinGenerated).run()
-                    }
+//                    if (implementDTO != null) {
+//                        DTOGenerator(typeElement, elements.map { it.qualifiedName.toString() }, kotlinGenerated).run()
+//                    }
 
                     if (implementModel != null) {
-                        implementedModels.add(
+                        ProcessingContext.implementedModels.add(
                                 ModelGenerator(
                                         typeElement,
                                         elements.map { it.qualifiedName.toString() },
                                         kotlinGenerated,
-                                        implementModel = implementModel).apply { run() })
+                                        implementModel = implementModel))
                     } else {
                         println(typeElement.toString())
                     }
@@ -139,8 +142,15 @@ class ModelImplementationProcessor : AbstractProcessor() {
             }
         }
 
+        /**
+         * Generate implementations for all models
+         */
+        ProcessingContext.implementedModels.forEach {
+            it.run()
+        }
+
         if(typescriptGenerated != null) {
-            val models = implementedModels
+            val models = ProcessingContext.implementedModels
                     .filter { it.classNameSpec != null }
                     .map { it.classNameSpec!! }
                     .toSet()
@@ -152,21 +162,6 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
     private fun typescript(classes: Set<ImmutableKmClass>, path: String) {
         val tsDir = File(path).apply { mkdirs() }
-
-//        for(kclass in classes) {
-//            TypeScriptGenerator(
-//                    rootClasses = classes,
-//                    mappings = mapOf(
-//                            LocalDateTime::class.asClassName() to "Date",
-//                            LocalDate::class.asClassName() to "Date",
-//                            UUID::class.asClassName() to "string"
-//                    )
-//            ).definitionsText.apply {
-//                FileWriter(File("${tsDir.absolutePath}/${kclass.typeSpec.name}.ts")).use {
-//                    it.write(this)
-//                }
-//            }
-//        }
 
         TypeScriptGenerator(
                 rootClasses = classes,

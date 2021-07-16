@@ -1,5 +1,7 @@
 package net.eraga.tools.model
 
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.asClassName
 import net.eraga.tools.models.*
 import java.util.*
 import javax.lang.model.element.TypeElement
@@ -20,15 +22,10 @@ import javax.lang.model.element.TypeElement
 class ModelMetadata(
         element: TypeElement,
         val modelSettings: ImplementModel) {
+    val templateClassName: ClassName = ClassName.bestGuess(element.qualifiedName.toString())
     val equalsSettings: ImplementEquals? = element.getAnnotation(ImplementEquals::class.java)
     val hashCodeSettings: ImplementHashCode? = element.getAnnotation(ImplementHashCode::class.java)
     val comparableSettings: ImplementComparable? = element.getAnnotation(ImplementComparable::class.java)
-
-//    val comparableInterface = try {
-//        element.interfaces.first { it.toString().contains("Comparable") }
-//    } catch (_: Exception) {
-//        null
-//    }
 
     val interfaceClassName = element.simpleName.toString()
     val baseName = interfaceClassName.removeSuffix(modelSettings.templateSuffix)
