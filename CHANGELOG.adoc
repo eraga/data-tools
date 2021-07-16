@@ -15,14 +15,16 @@ New features and improvements:
 
 New features and improvements:
 
-* New `ImplementModel` annotation argument: `templateSuffix`, defaults to `Template`.
-* Immutable `ObjectModel` interface is now generated from `ObjectTemplate` interface.
+* New `ImplementModel` annotation arguments: `templateSuffix`, defaults to `Template`.
+* Immutable `ObjectModel` interface can be generated either from `ObjectTemplate` interface or skipped so Template itself can be ImmutableModel.
+* xref:model-annotations/src/main/kotlin/net/eraga/tools/models/GeneratedClass.kt[GeneratedClass] hints processor about properties of types that are generated from Template but not inherited from it.
 * `Comparable` implementation, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementComparable.kt[ImplementComparable] Annotation
 * Option to completely disable default class (and DSL initializer) generation.
 * Option to generate abstract class (with no DSL initializer).
 * `hashCode` / `equals` implementations, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementHashCode.kt[ImplementHashCode] Annotation and xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementEquals.kt[ImplementEquals] Annotation to overcome xref:https://blog.jetbrains.com/kotlin/2015/09/feedback-request-limitations-on-data-classes/[Limitations on Data Classes]
 * Basic support of TypeScript data model generation by partial rewriting of xref:https://github.com/ntrrgc/ts-generator[ts-generator] to make it work on top of kotlinpoet.
 * Generate multiple implementations with annotation xref:model-annotations/src/main/kotlin/net/eraga/tools/models/Implementations.kt[Implementations].
+
 //* TODO: Generate class to class convertors
 //* TODO: Inherit annotations (select by package wildcard)
 //TODO: * Boilerplate classes for Spring Controller/Service/Repository in conjunction with DTO
