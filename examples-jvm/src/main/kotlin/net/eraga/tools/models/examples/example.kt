@@ -16,9 +16,7 @@ package net.eraga.tools.models.examples
 import net.eraga.tools.models.*
 import java.time.LocalDateTime
 import java.util.*
-import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
-import kotlin.reflect.jvm.internal.impl.name.FqName
+import javax.persistence.Entity
 
 
 /**
@@ -61,7 +59,7 @@ interface WithLongId : WithAnyId {
 /**
  * Временная настройка, используется в [EventModel.timeSettings]
  */
-@ImplementModel(classKind = Kind.OPEN)
+//@ImplementModel(kclass = ImplementationMeta(ClassKind.OPEN))
 interface TimeSettingTemplate
 //    : WithAnyId
 
@@ -72,23 +70,23 @@ interface WithTimeSettings {
 /**
  * Part of [Schedule.events]
  */
-@ImplementModel(classKind = Kind.DATA)
-@ImplementHashCode
-@ImplementEquals
-@ImplementComparable(order = ["id", "endTime"])
+//@ImplementModel
+//@ImplementHashCode
+//@ImplementEquals
+//@ImplementComparable
 interface EventTemplate :
-    WithUUId,
-    WithTimeSettings,
-    WithStartEndTimeStamp {
+        WithUUId,
+        WithTimeSettings,
+        WithStartEndTimeStamp {
 
-//    val intArray: IntArray
+    //    val intArray: IntArray
     val array: Array<Int>
     val longArray: Array<Long>
     val stringArray: Array<String>
 
     @PreventOverride
     val someUtilityCalc: Long
-    get() = startTime + endTime
+        get() = startTime + endTime
 }
 
 interface WithEvents {
@@ -101,7 +99,7 @@ interface WithEvents {
 /**
  * Базовый интерфейс рекламной кампании
  */
-interface Schedule:
+interface Schedule :
         WithLongId,
         WithEvents {
 
@@ -116,6 +114,7 @@ interface WithOptionalStartEndTimeStamp {
      * Время начала (включительно), UNIX Timestamp, миллисекунды
      */
     val startTime: Long?
+
     /**
      * Время окончания **(исключительно)**, UNIX Timestamp, миллисекунды
      */
@@ -143,20 +142,55 @@ interface WithPeriod {
 }
 
 //@CSModelDSLMarker
-@ImplementModel(classKind = Kind.OPEN)
-@ClassInitializers(list = [ClassMapping(source = MutableList::class, target = LinkedList::class)])
+//@ImplementModel(kclass = ImplementationMeta(ClassKind.OPEN))
+//@ClassInitializers(list = [ClassMapping(source = MutableList::class, target = LinkedList::class)])
 interface PeriodicalScheduleTemplate :
         Schedule,
         WithPeriod
 
 data class A(val a: Array<Int> = arrayOf())
 
-@ImplementModel
-@ImplementEquals
-@ImplementHashCode
+//@ImplementModel
+//@ImplementEquals
+//@ImplementHashCode
+//@ImplementComparable
+//interface BTemplate {
+//    val a: Array<Int>
+//}
+
+interface WithAB<A, B>
+
+@Implementations(
+//        ImplementModel(),
+        ImplementModel(
+                kclass = ImplementationMeta(ClassKind.DATA, "Dto"),
+                immutable = ImplementationMeta(ClassKind.NONE, "DtoImmutable"),
+                mutable = ImplementationMeta(ClassKind.NONE, "DtoMutable"),
+                inheritTemplate = false
+        )
+)
 @ImplementComparable
-interface BTemplate {
-    val a: Array<Int>
+@ImplementHashCode
+@ImplementEquals
+@Entity
+interface ShinyObjectTemplate
+    : WithUUId, WithAB<WithUUId, Long>
+{
+//    @ConstructorInitializer("\"Fuck you initialization!\"")
+//    var display: String
+//    var name: String
+//    var gid: String
+//    var externalId: Long?
+//    var resolution: Pair<Long, Long>?
+//    val org: String?
+//    val isSomething: Boolean
+//    val array: Array<Byte>
+//    val stringArray: Array<String?>
+//    val longArray: Array<Long>
+//    val longList: List<Long?>
+//    val list: List<WithUUId>
+//    val map: Map<WithAB<Long, Array<Long>>, Long?>
+    val map2: Map<Long, Long?>
 }
 
 fun main() {
@@ -164,24 +198,24 @@ fun main() {
 //    println(JavaToKotlinClassMap.INSTANCE.mapKotlinToJava(FqName(Array::class.qualifiedName.toString()).toUnsafe())
 //        ?.asSingleFqName()
 //        ?.asString())
-    val a1 = A(arrayOf(1,2,3))
-    val a2 = A(arrayOf(1,2,3))
-    val b1 = B(arrayOf(1,2,3))
-    val b2 = B(arrayOf(1,2,3))
+    val a1 = A(arrayOf(1, 2, 3))
+    val a2 = A(arrayOf(1, 2, 3))
 
-    println(a1 == a2)
-    println(b1 == b2)
+//    val b1 = B(arrayOf(1, 2, 3))
+//    val b2 = B(arrayOf(1, 2, 3))
 
+//    println(a1 == a2)
+//    println(b1 == b2)
 
 
     val intArray = intArrayOf()
     val intArray2 = intArrayOf()
     intArray.contentEquals(intArray2)
 
-    val a = arrayOf(1,2,3)
-    val b = arrayOf(1,2,3)
-    val la = listOf(1,2,3)
-    val lb = listOf(1,2,3)
+    val a = arrayOf(1, 2, 3)
+    val b = arrayOf(1, 2, 3)
+    val la = listOf(1, 2, 3)
+    val lb = listOf(1, 2, 3)
 
 //    println(a == b)
 //    println(a === b)
@@ -201,12 +235,11 @@ fun main() {
 //    println(la.equals(lb))
 
 
-
-    val event = Event()
-    val event2 = Event()
-    if(event > event2) {
-        print("can't be")
-    }
+//    val event = Event()
+//    val event2 = Event()
+//    if (event > event2) {
+//        print("can't be")
+//    }
     val time1 = LocalDateTime.now()
     val time2 = LocalDateTime.now()
     time1.compareTo(time2)

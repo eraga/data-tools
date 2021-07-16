@@ -10,6 +10,10 @@ package net.eraga.tools.models
  * Default
  *
  * @param arrayComparing array equality expression, see [ArrayComparing]
+ * @author
+ *  [Klaus Schwartz](mailto:klaus@eraga.net)
+ *
+ *  Developed at [eRaga InfoSystems](https://www.eraga.net/)
  */
 annotation class ImplementEquals(
     val arrayComparing: ArrayComparing = ArrayComparing.STRUCTURAL_RECURSIVE

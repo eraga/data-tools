@@ -28,9 +28,15 @@ subprojects {
     group 'net.eraga.tools.model'
     version = "$version"
 
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+
     ext {
         nexusUsername = "unknown"
         nexusPassword = "unknown"
+        npmToken = "unknown"
     }
 
     task sourcesJar(type: Jar) {

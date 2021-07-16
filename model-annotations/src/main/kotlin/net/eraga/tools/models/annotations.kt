@@ -57,11 +57,16 @@ annotation class PrimitiveInitializers(
 )
 
 
-enum class Kind {
+enum class ClassKind {
     /**
      * Don't implement default class
      */
     NONE,
+
+    /**
+     * Implement interface
+     */
+    INTERFACE,
 
     /**
      * Implement open class
@@ -76,7 +81,8 @@ enum class Kind {
     /**
      * Implement abstract class
      */
-    ABSTRACT
+    ABSTRACT;
+
 }
 
 @Suppress("unused")
