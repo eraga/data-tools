@@ -8,6 +8,7 @@ import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.ImplementModel
 import net.eraga.tools.models.ClassKind
 import net.eraga.tools.models.GeneratedClass
+import net.eraga.tools.models.IgnoreIt
 import java.io.File
 import java.io.Serializable
 import javax.lang.model.element.AnnotationMirror
@@ -20,7 +21,7 @@ import kotlin.collections.LinkedHashSet
 /**
  * **ModelGenerator**
  *
- * TODO: Class ModelGenerator description
+ * Generator of boilerplate implementations by Template/Model interface.
  *
  * @author
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
@@ -40,7 +41,7 @@ class ModelGenerator(
     : AbstractGenerator(element, allElements, kotlinGenerated) {
     val metadata = ModelMetadata(element, implementModel)
 
-    val templateInterfaceClass = if (metadata.modelSettings.inheritTemplate)
+    private val templateInterfaceClass = if (metadata.modelSettings.inheritTemplate)
         ClassName(
                 metadata.elementPackage,
                 metadata.interfaceClassName
@@ -48,7 +49,7 @@ class ModelGenerator(
     else
         null
 
-    val immutableInterfaceClass = if (metadata.modelSettings.immutable.classKind == ClassKind.INTERFACE)
+    private val immutableInterfaceClass = if (metadata.modelSettings.immutable.classKind == ClassKind.INTERFACE)
         ClassName(
                 metadata.elementPackage,
                 metadata.immutableInterfaceName
@@ -56,7 +57,7 @@ class ModelGenerator(
     else
         null
 
-    val mutableInterfaceClass =  if (metadata.modelSettings.mutable.classKind == ClassKind.INTERFACE)
+    private val mutableInterfaceClass =  if (metadata.modelSettings.mutable.classKind == ClassKind.INTERFACE)
         ClassName(
                 metadata.elementPackage,
                 metadata.mutableInterfaceName
@@ -64,7 +65,7 @@ class ModelGenerator(
     else
         null
 
-    val implementationClass = if (metadata.modelSettings.kclass.classKind > ClassKind.INTERFACE) {
+    private val implementationClass = if (metadata.modelSettings.kclass.classKind > ClassKind.INTERFACE) {
         ClassName(
                 metadata.elementPackage,
                 metadata.implClassName
@@ -72,7 +73,7 @@ class ModelGenerator(
     } else
         null
 
-    fun getLastFromInheritanceChain(inheritTemplate: Boolean = metadata.modelSettings.inheritTemplate): ClassName? {
+    private fun getLastFromInheritanceChain(inheritTemplate: Boolean = metadata.modelSettings.inheritTemplate): ClassName? {
         if(!inheritTemplate)
             return immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
         return templateInterfaceClass ?: immutableInterfaceClass ?: mutableInterfaceClass ?: implementationClass
@@ -134,6 +135,7 @@ class ModelGenerator(
         val constructorBuilder = FunSpec.constructorBuilder()
         val propertySet = LinkedHashSet<PropertySpec>()
 
+        var propertyNum = 0
         for ((name, propertyData) in gatherProperties(element)) {
             if (propertyData.preventOverride)
                 continue
@@ -195,10 +197,6 @@ class ModelGenerator(
                 }
             }
 
-            if(type.toString().contains("NonExistentClass")) {
-                println("Non xistent !! $type")
-            }
-
             val kotlinProperty = PropertySpec.builder(
                     name,
                     type
@@ -243,18 +241,28 @@ class ModelGenerator(
                             val meta = typeModel.metadata
                             "${meta.implClassName}()"
                         } catch(e: NoSuchElementException) {
-                            val initlzr = type.classToInitializer(metadata.classInitializers)
-                            if(initlzr.contains("NonExistentClass")) {
-                                println("$initlzr == $type")
+                            val classInitializer = type.classToInitializer(metadata.classInitializers)
+                            if(classInitializer.contains("NonExistentClass")) {
+                                println("$classInitializer == $type")
                                 type.toString()
                             }
-                            initlzr
+                            classInitializer
                         }
                     }
                 }
             }
             if(getLastFromInheritanceChain() == mutableInterfaceClass)
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
+
+            if(metadata.constructorVarargPosition() == propertyNum)
+                constructorBuilder.addParameter(
+                        ParameterSpec.builder(
+                                "skipMe",
+                                IgnoreIt::class.asTypeName()
+                        )
+                                .addModifiers(KModifier.VARARG)
+                                .build()
+                )
 
             constructorBuilder.addParameter(
                     ParameterSpec.builder(
@@ -266,6 +274,7 @@ class ModelGenerator(
             )
 
             propertySet.add(kotlinProperty.initializer(name).build())
+            propertyNum++
         }
 
         val classModifier = when (metadata.modelSettings.kclass.classKind) {

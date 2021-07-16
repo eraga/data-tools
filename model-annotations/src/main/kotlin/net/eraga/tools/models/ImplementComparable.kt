@@ -11,7 +11,7 @@ package net.eraga.tools.models
  * [ImplementComparable] annotation allows to tune generation settings for `override fun compareTo()`.
  *
  * @param order of properties to compare, empty means default order will be used which is order if
- * class superinterfaces.
+ * class superinterfaces. Reverse order can be enforced my `-` sign before property name, e.g. ["-weight", "id"]
  * @param compareAllProperties if set to `false` will only use for comparison properties that are listed in [order]
  * parameter.
  */

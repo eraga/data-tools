@@ -40,5 +40,7 @@ class ModelMetadata(
 
     val classInitializers = classInitializersMap(element.getAnnotation(ClassInitializers::class.java))
 
-
+    fun constructorVarargPosition(): Int {
+        return if(modelSettings.forceUseArgNamesInConstructor) modelSettings.forceUseArgNamesInConstructorSkip else -1
+    }
 }
