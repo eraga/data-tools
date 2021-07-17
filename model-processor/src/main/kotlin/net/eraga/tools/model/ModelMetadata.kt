@@ -41,6 +41,12 @@ class ModelMetadata(
     val classInitializers = classInitializersMap(element.getAnnotation(ClassInitializers::class.java))
 
     fun constructorVarargPosition(): Int {
+        /**
+         * Kotlin data classes don't support constructor varargs
+         */
+        if(modelSettings.kclass.classKind == ClassKind.DATA)
+            return -1
+
         return if(modelSettings.forceUseArgNamesInConstructor) modelSettings.forceUseArgNamesInConstructorSkip else -1
     }
 }

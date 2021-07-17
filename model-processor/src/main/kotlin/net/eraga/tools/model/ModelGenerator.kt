@@ -134,7 +134,6 @@ class ModelGenerator(
 
 
         val constructorBuilder = FunSpec.constructorBuilder()
-        val propertySet = LinkedHashSet<PropertySpec>()
 
         var propertyNum = 0
         for ((name, propertyData) in gatherProperties(element)) {
@@ -346,7 +345,6 @@ class ModelGenerator(
             classBuilder
                     .addModifiers(classModifier)
                     .primaryConstructor(constructorBuilder.build())
-//                    .addProperties(propertySet)
 
             if (metadata.hashCodeSettings != null) {
                 val funBodyBuilder = funHashCodeBuilder(classBuilder.propertySpecs, metadata.hashCodeSettings)
