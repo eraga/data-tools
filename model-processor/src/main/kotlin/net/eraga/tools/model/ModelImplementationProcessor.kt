@@ -1,7 +1,6 @@
 package net.eraga.tools.model
 
-import com.squareup.kotlinpoet.DelicateKotlinPoetApi
-import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
@@ -149,6 +148,9 @@ class ModelImplementationProcessor : AbstractProcessor() {
             it.run()
         }
 
+        if(ProcessingContext.implementedModels.any { it.metadata.modelSettings.forceUseArgNamesInConstructor })
+            generateIgnoreItClass()
+
         if(typescriptGenerated != null) {
             val models = ProcessingContext.implementedModels
                     .filter { it.classNameSpec != null }
@@ -175,6 +177,14 @@ class ModelImplementationProcessor : AbstractProcessor() {
                 it.write(this)
             }
         }
+    }
+
+    private fun generateIgnoreItClass() {
+        val ignoreItClassName = ProcessingContext.ignoreItClassName
+        FileSpec.builder(ignoreItClassName.packageName, ignoreItClassName.canonicalName)
+                .addType(TypeSpec.classBuilder(ignoreItClassName).build())
+                .build()
+                .writeTo(File(kotlinGenerated))
     }
 }
 

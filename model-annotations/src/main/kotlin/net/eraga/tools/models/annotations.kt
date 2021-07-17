@@ -59,6 +59,11 @@ enum class ClassKind {
     INTERFACE,
 
     /**
+     * Implement final class
+     */
+    FINAL,
+
+    /**
      * Implement open class
      */
     OPEN,

@@ -8,6 +8,8 @@ package net.eraga.tools.models
  * [ImplementModel.forceUseArgNamesInConstructor] will add vararg of type [IgnoreIt]
  * to the beginning of constructor enforcing kotlin to warn about argument order.
  *
+ * This is for documentation purposes only. Real class will be generated.
+ *
  * @author
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
  *

@@ -127,9 +127,10 @@ class ModelGenerator(
             kmClassSpec.superinterfaces.keys.forEach {
                 builderFromInheritanceChain().addSuperinterface(it)
             }
-            if(implementationClass != null)
-                classNameSpec = kmClass
         }
+
+        if(implementationClass != null)
+            classNameSpec = kmClass
 
 
         val constructorBuilder = FunSpec.constructorBuilder()
@@ -218,6 +219,8 @@ class ModelGenerator(
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
             mutableInterfaceBuilder?.addProperty(kotlinProperty.mutable(true).build())
 
+//            if(getLastFromInheritanceChain() == implementationClass)
+
             val defaultValue = defaultInit ?: if (type.isNullable) {
                 "null"
             } else {
@@ -258,7 +261,7 @@ class ModelGenerator(
                 constructorBuilder.addParameter(
                         ParameterSpec.builder(
                                 "skipMe",
-                                IgnoreIt::class.asTypeName()
+                                ProcessingContext.ignoreItClassName
                         )
                                 .addModifiers(KModifier.VARARG)
                                 .build()
@@ -273,13 +276,16 @@ class ModelGenerator(
                             .build()
             )
 
-            propertySet.add(kotlinProperty.initializer(name).build())
+            classBuilder?.addProperty(kotlinProperty.mutable(true).initializer(name).build())
             propertyNum++
         }
 
         val classModifier = when (metadata.modelSettings.kclass.classKind) {
             ClassKind.OPEN -> {
                 KModifier.OPEN
+            }
+            ClassKind.FINAL -> {
+                KModifier.FINAL
             }
             ClassKind.ABSTRACT -> {
                 KModifier.ABSTRACT
@@ -340,7 +346,7 @@ class ModelGenerator(
             classBuilder
                     .addModifiers(classModifier)
                     .primaryConstructor(constructorBuilder.build())
-                    .addProperties(propertySet)
+//                    .addProperties(propertySet)
 
             if (metadata.hashCodeSettings != null) {
                 val funBodyBuilder = funHashCodeBuilder(classBuilder.propertySpecs, metadata.hashCodeSettings)

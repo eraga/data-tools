@@ -25,6 +25,8 @@ import javax.lang.model.util.Types
  */
 @KotlinPoetMetadataPreview
 object ProcessingContext {
+    val ignoreItClassName = ClassName("net.eraga.tools.models", "IgnoreIt")
+
     lateinit var implementedModels: MutableList<ModelGenerator>
 
     lateinit var classInspector: ClassInspector
@@ -108,15 +110,20 @@ object ProcessingContext {
 
         val kotlinMetaClass = Class.forName("kotlin.Metadata").asSubclass(Annotation::class.java)
         if(typeElement == null) {
-            println("WARNING: ${className.canonicalName}: ${typeElement?.getAnnotation(kotlinMetaClass) != null}")
-            print("INFO: ")
+//            println("WARNING: ${className.canonicalName}: ${typeElement?.getAnnotation(kotlinMetaClass) != null}")
+//            print("INFO: ")
 //            kotlinToJava
             val typeSpec = makeTypeSpec(className)
             typeSpecs[className] = typeSpec
             return typeSpec
         }
-        val typeSpec = typeElement.toTypeSpec(classInspector)
-        typeSpecs[className] = typeSpec
-        return typeSpec
+        try {
+            val typeSpec = typeElement.toTypeSpec(classInspector)
+            typeSpecs[className] = typeSpec
+            return typeSpec
+        } catch (e: Exception) {
+            println("ERROR: ${className.canonicalName}: ${typeElement.getAnnotation(kotlinMetaClass) != null}")
+            throw e
+        }
     }
 }

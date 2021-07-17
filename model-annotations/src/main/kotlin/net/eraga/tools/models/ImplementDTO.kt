@@ -14,8 +14,13 @@ package net.eraga.tools.models
  *  Date: 13/07/2021
  *  Time: 18:59
  */
-annotation class ImplementDTO(
-        val classKind: ClassKind = ClassKind.DATA,
-        val templateSuffix: String = "Template",
-        val implSuffix: String = "Dto"
-)
+@ImplementModel(
+        inheritTemplate = false,
+        immutable = ImplementationMeta(ClassKind.NONE),
+        mutable = ImplementationMeta(ClassKind.NONE))
+annotation class ImplementDTO
+//(
+//        val classKind: ClassKind = ClassKind.DATA,
+//        val templateSuffix: String = "Template",
+//        val implSuffix: String = "Dto"
+//)
