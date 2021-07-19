@@ -20,7 +20,7 @@ annotation class ClassMapping(
 
 
 /**
- * Provides default constructor initializers for [ImplementModel] processor
+ * Provides default constructor initializers for [ImplementationSettings] processor
  *
  * @list  of interface initializers enclosed in [ClassMapping]
  */
@@ -31,7 +31,7 @@ annotation class ClassInitializers(
 )
 
 /**
- * Provides primitive types initializers for [ImplementModel] processor
+ * Provides primitive types initializers for [ImplementationSettings] processor
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)
@@ -46,27 +46,29 @@ annotation class PrimitiveInitializers(
         val Double: Double = 0.0
 )
 
-
-enum class ClassKind {
+/**
+ * Determines which implementation to select
+ */
+enum class Kind {
     /**
-     * Don't implement default class
+     * Don't implement
      */
     NONE,
 
     /**
      * Implement interface
      */
-    INTERFACE,
+    OPEN_INTERFACE,
 
     /**
      * Implement final class
      */
-    FINAL,
+    FINAL_CLASS,
 
     /**
      * Implement open class
      */
-    OPEN,
+    OPEN_CLASS,
 
     /**
      * Implement data class
@@ -80,18 +82,17 @@ enum class ClassKind {
 
 }
 
-@Suppress("unused")
 fun ClassInitializers.classMappingDefaults(): Map<KClass<*>, KClass<*>> {
     return mapOf(
-           Pair(Set::class, HashSet::class),
-           Pair(MutableSet::class, HashSet::class),
-           Pair(Map::class, HashMap::class),
-           Pair(MutableMap::class, HashMap::class),
-           Pair(Iterable::class, ArrayList::class),
-           Pair(MutableIterable::class, ArrayList::class),
-           Pair(Collection::class, ArrayList::class),
-           Pair(MutableCollection::class, ArrayList::class),
-           Pair(List::class, ArrayList::class),
-           Pair(MutableList::class, ArrayList::class)
-   )
+            Pair(Set::class, HashSet::class),
+            Pair(MutableSet::class, HashSet::class),
+            Pair(Map::class, HashMap::class),
+            Pair(MutableMap::class, HashMap::class),
+            Pair(Iterable::class, ArrayList::class),
+            Pair(MutableIterable::class, ArrayList::class),
+            Pair(Collection::class, ArrayList::class),
+            Pair(MutableCollection::class, ArrayList::class),
+            Pair(List::class, ArrayList::class),
+            Pair(MutableList::class, ArrayList::class)
+    )
 }

@@ -1,10 +1,13 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.metadata.ImmutableKmClass
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.*
+import net.eraga.tools.models.CompareTo
 import java.util.*
 import javax.lang.model.element.*
 import javax.lang.model.type.TypeKind
@@ -12,7 +15,6 @@ import kotlin.NoSuchElementException
 
 /**
  * **AbstractGenerator**
- *
  *
  * @author
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
@@ -23,12 +25,13 @@ import kotlin.NoSuchElementException
  *  Time: 19:20
  */
 @KotlinPoetMetadataPreview
-abstract class AbstractGenerator(
-        protected val element: TypeElement,
-        allElements: List<String>,
-        protected var kotlinGenerated: String
+abstract class AbstractGenerator<T : AbstractSettings<*>>(
+        val listOfImplementations: List<T>
 ) : Runnable {
-    protected val elements: List<String> = allElements
+    protected val fileSpecs: MutableList<FileSpec> = mutableListOf()
+
+    val generatedSpecs: List<FileSpec>
+        get() = fileSpecs
 
     protected abstract fun generate()
 
@@ -36,7 +39,12 @@ abstract class AbstractGenerator(
         generate()
     }
 
-    fun gatherProperties(element: TypeElement, level: Int = 0): Map<String, PropertyData> {
+    var classNameSpec: ImmutableKmClass? = null
+        protected set
+
+    fun gatherProperties(
+            element: TypeElement,
+            level: Int = 0): Map<String, PropertyData> {
         val getters = LinkedHashMap<String, PropertyData>()
 
         for (iface in element.interfaces) {
@@ -178,9 +186,112 @@ abstract class AbstractGenerator(
         return getters
     }
 
+    fun determinePropertyType(
+            element: TypeElement,
+            propertyData: PropertyData): TypeName {
+        return if (propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
+//                propertyData.typeSpec.syntheticMethodForAnnotations
+//                val generatedClass = getter.getAnnotation(GeneratedClass::class.java)
+            val isConstructorInitializer = { mirror: AnnotationMirror ->
+                mirror.annotationType.asElement().simpleName.toString() == GeneratedClass::class.java.simpleName
+            }
+            val annotatedProps: List<Element>? = element
+                    .enclosedElements
+                    .first {
+                        it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
+                    }
+                    .enclosedElements
+                    ?.filter {
+                        it.simpleName.contains("annotations") &&
+                                it.annotationMirrors.any { mirror ->
+                                    isConstructorInitializer(mirror)
+                                }
+                    }
+
+
+            val propertyInitMap = annotatedProps?.filter {
+                it.annotationMirrors.any { mirror ->
+                    isConstructorInitializer(mirror)
+                }
+            }?.associateBy({
+                it.simpleName.split("$").first()
+            }, {
+                it.annotationMirrors
+                        .first { mirror ->
+                            isConstructorInitializer(mirror)
+                        }
+                        .elementValues
+                        .values
+                        .first()
+                        .value
+                        .toString()
+            })
+
+            if (propertyInitMap!!.values.first().isNotBlank())
+                ClassName.bestGuess(propertyInitMap.values.first())
+            else
+                propertyData.propertySpec.type
+        } else {
+            try {
+                ProcessingContext.implementedModels
+                        .flatMap { it.listOfImplementations }
+                        .first { impl ->
+                            impl.implClassName == propertyData.propertySpec.type
+
+                        }.implClassName
+
+            } catch (_: NoSuchElementException) {
+                propertyData.propertySpec.type
+            }
+        }
+    }
+
+    fun constructorDefaultInitializer(
+            settings: AbstractSettings<*>,
+            type: TypeName,
+            propertyData: PropertyData): String {
+        return if (type.isNullable) {
+            "null"
+        } else {
+            val returnTypeSpec = propertyData.propertySpec.type.asTypeSpec()
+            if (returnTypeSpec.isEnum) {
+                try {
+                    "${returnTypeSpec.name}.${returnTypeSpec.enumConstants.keys.first()}"
+                } catch (e: NoSuchElementException) {
+                    "$type.values()[0]"
+                }
+            } else {
+                val simpleTypeName = type.toString().split(".").last()
+
+                if (settings.primitiveInitializers.containsKey(simpleTypeName)) {
+                    settings.primitiveInitializers[simpleTypeName].toString()
+                } else {
+                    try {
+                        val typeModel = ProcessingContext
+                                .implementedModels
+                                .flatMap { it.listOfImplementations }
+                                .first { impl ->
+                                    impl.implClassName == type
+                                }
+
+                        val meta = typeModel
+                        "${meta.implClassName}()"
+                    } catch (e: NoSuchElementException) {
+                        val classInitializer = type.classToInitializer(settings.classInitializers)
+                        if (classInitializer.contains("NonExistentClass")) {
+                            println("$classInitializer == $type")
+                            type.toString()
+                        }
+                        classInitializer
+                    }
+                }
+            }
+        }
+    }
+
     fun funCompareToBuilder(
             propertySpecs: MutableList<PropertySpec>,
-            comparableSettings: ImplementComparable
+            comparableSettings: CompareTo
     ): CodeBlock.Builder {
         val orderedProperties = mutableListOf<PropertySpec>()
         fun String.withoutMinus(): String {
@@ -191,8 +302,7 @@ abstract class AbstractGenerator(
                 try {
                     orderedProperties.add(propertySpecs.first { it.name == name.withoutMinus() })
                 } catch (e: NoSuchElementException) {
-                    throw NoSuchElementException("Property with name='$name' not found in $propertySpecs " +
-                            "for class ${element.simpleName}")
+                    throw NoSuchElementException("Property with name='$name' not found in $propertySpecs ")
                 }
             }
             val orderWithoutMinus = comparableSettings.order.map { it.withoutMinus() }
@@ -235,7 +345,7 @@ abstract class AbstractGenerator(
 
     fun funHashCodeBuilder(
             propertySpecs: MutableList<PropertySpec>,
-            hashCodeSettings: ImplementHashCode
+            hashCodeSettings: HashCode
     ): CodeBlock.Builder {
         val funBodyBuilder = CodeBlock.builder()
         funBodyBuilder.add("var hashCode = 0\n")
@@ -258,7 +368,7 @@ abstract class AbstractGenerator(
     fun funEqualsBuilder(
             propertySpecs: MutableList<PropertySpec>,
             className: String,
-            equalsSettings: ImplementEquals
+            equalsSettings: Equals
     ): CodeBlock.Builder {
         val funBodyBuilder = CodeBlock.builder()
         funBodyBuilder.add(
@@ -283,5 +393,126 @@ abstract class AbstractGenerator(
         funBodyBuilder.add("return true\n")
 
         return funBodyBuilder
+    }
+
+    fun funAllArgsConstructorCode(
+            propertySpecs: List<PropertySpec>
+    ): CodeBlock.Builder {
+        val funBodyBuilder = CodeBlock.builder()
+        if (propertySpecs.size > 0) {
+            for (prop in propertySpecs) {
+                funBodyBuilder.add("this.%L = %L\n", prop.name, prop.name)
+            }
+        }
+
+        return funBodyBuilder
+    }
+
+    fun funModelConstructorBuilder(
+            settings: AbstractSettings<*>,
+            propertySpecs: List<PropertySpec>
+    ): FunSpec.Builder {
+        val paramName = settings.modelClassName.simpleName
+        val constructorBuilder = FunSpec.constructorBuilder()
+        val funBodyBuilder = CodeBlock.builder()
+        constructorBuilder.addParameter(paramName, settings.modelClassName)
+        if (propertySpecs.size > 0) {
+            for (prop in propertySpecs) {
+                funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
+            }
+        }
+
+        constructorBuilder.addCode(funBodyBuilder.build())
+
+        return constructorBuilder
+    }
+
+    fun funModelExtensionToBuilder(
+            settings: AbstractSettings<*>,
+            propertySpecs: List<PropertySpec>
+    ): FunSpec.Builder {
+        val extToBuilder = FunSpec.builder("to${settings.implClassName.simpleName}")
+                .receiver(settings.modelClassName)
+                .returns(settings.implClassName)
+        val funBodyBuilder = CodeBlock.builder()
+
+        if (propertySpecs.size > 0) {
+            val props = propertySpecs.joinToString { "${it.name} = this.${it.name}" }
+            funBodyBuilder.addStatement("return ${settings.implClassName.simpleName}(%L)", props)
+        }
+
+        extToBuilder.addCode(funBodyBuilder.build())
+
+        return extToBuilder
+    }
+
+
+
+    fun implementToString(typeBuilder: TypeSpec.Builder) {
+        throw UnsupportedOperationException("not implemented") //TODO
+    }
+
+    fun implementEquals(
+            settings: AbstractSettings<*>,
+            typeBuilder: TypeSpec.Builder
+    ) {
+        val funBodyBuilder = funEqualsBuilder(
+                typeBuilder.propertySpecs,
+                typeBuilder.build().name!!,
+                settings.equalsSettings
+        )
+        val funBody = funBodyBuilder.build()
+
+        val compareToFun = FunSpec.builder("equals")
+                .returns(Boolean::class)
+                .addParameter(
+                        "other",
+                        Any::class.asTypeName().copy(nullable = true)
+                )
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
+    }
+
+    fun implementHashCode(
+            settings: AbstractSettings<*>,
+            typeBuilder: TypeSpec.Builder) {
+        val funBodyBuilder = funHashCodeBuilder(
+                typeBuilder.propertySpecs,
+                settings.hashCodeSettings)
+        val funBody = funBodyBuilder.build()
+
+        val compareToFun = FunSpec.builder("hashCode")
+                .returns(Int::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
+    }
+
+    fun implementComparable(
+            settings: AbstractSettings<*>,
+            typeBuilder: TypeSpec.Builder) {
+        val funBodyBuilder =
+                funCompareToBuilder(typeBuilder.propertySpecs, settings.comparableSettings)
+
+        val funBody = funBodyBuilder.build()
+
+        val compareToFun = FunSpec.builder("compareTo")
+                .returns(Int::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter(
+                        ParameterSpec.builder(
+                                "other",
+                                settings.implClassName
+                        ).build()
+                )
+                .addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
     }
 }

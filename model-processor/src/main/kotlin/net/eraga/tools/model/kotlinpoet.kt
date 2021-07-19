@@ -10,7 +10,9 @@ import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.model.typescript.ClassNameSpec
+import javax.lang.model.element.TypeElement
 import javax.lang.model.type.TypeMirror
+import kotlin.reflect.KClass
 
 /**
  * **kotplinpoet**
@@ -104,6 +106,14 @@ fun ImmutableKmClass.asClassName(): ClassName {
 @KotlinPoetMetadataPreview
 fun ImmutableKmClass.asTypeSpec(): TypeSpec {
     return toTypeSpec(ProcessingContext.classInspector)
+}
+
+
+@KotlinPoetMetadataPreview
+fun TypeElement.implements(kclass: KClass<*>): Boolean {
+    val kmClass = this.toImmutableKmClass()
+
+    return kmClass.supertypes.any { it.classifier.classString() == kclass.qualifiedName }
 }
 
 @KotlinPoetMetadataPreview

@@ -17,13 +17,18 @@ repositories {
 val typeScriptGenerated = "$buildDir/generated/source/kaptTypeScript/main"
 //val typeScriptGenerated = "$buildDir/publications/npm/${project.name}"
 
-//kapt {
-//    arguments {
-//        arg("kapt.typescript.generated", typeScriptGenerated)
-//    }
-//}
+kapt {
+//    correctErrorTypes = true
+    arguments {
+        arg("kapt.typescript.generated", typeScriptGenerated)
+    }
+}
 
 //kotlin {
+//    target {
+//
+//    }
+//}
 //    js(IR) {
 //        binaries.library()
 //        browser() // or nodejs()
@@ -44,23 +49,19 @@ dependencies {
     testImplementation(group = "junit", name = "junit", version = "4.12")
 }
 
-//compileKotlin {
-//    kotlinOptions.jvmTarget = "1.8"
-//}
-//compileTestKotlin {
-//    kotlinOptions.jvmTarget = "1.8"
-//}
+val compileKotlin: org.jetbrains.kotlin.gradle.tasks.KotlinCompile by tasks
+val compileTestKotlin: org.jetbrains.kotlin.gradle.tasks.KotlinCompile by tasks
 
-kotlin {
-//    org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.jvm {
-//
-//    }
-//    target {
-//
-//    }
-    //sourceCompatibility = 1.8
-//targetCompatibility = 1.8
+compileKotlin.kotlinOptions {
+    jvmTarget = "1.8"
+    javaParameters = true
 }
+compileTestKotlin.kotlinOptions {
+    jvmTarget = "1.8"
+    javaParameters = true
+}
+
+
 
 npmPublishing {
     readme = file("README.MD") // (optional) Default readme file

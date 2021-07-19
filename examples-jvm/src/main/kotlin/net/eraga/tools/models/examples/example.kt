@@ -160,18 +160,18 @@ data class A(val a: Array<Int> = arrayOf())
 
 interface WithAB<A, B>
 
-@Implementations(
-//        ImplementModel(),
-        ImplementModel(
-                kclass = ImplementationMeta(ClassKind.DATA, "Dto"),
-                immutable = ImplementationMeta(ClassKind.NONE, "DtoImmutable"),
-                mutable = ImplementationMeta(ClassKind.NONE, "DtoMutable"),
-                inheritTemplate = false
-        )
-)
-@ImplementComparable
-@ImplementHashCode
-@ImplementEquals
+//@Implementations(
+////        ImplementModel(),
+//        ImplementModel(
+//                kclass = ImplementationMeta(ClassKind.DATA, "Dto"),
+//                immutable = ImplementationMeta(ClassKind.NONE, "DtoImmutable"),
+//                mutable = ImplementationMeta(ClassKind.NONE, "DtoMutable"),
+//                inheritTemplate = false
+//        )
+//)
+//@ImplementComparable
+//@ImplementHashCode
+//@ImplementEquals
 @Entity
 interface ShinyObjectTemplate
     : WithUUId, WithAB<WithUUId, Long>

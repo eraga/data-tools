@@ -15,7 +15,7 @@ New features and improvements:
 
 New features and improvements:
 
-* New `ImplementModel` annotation arguments: `templateSuffix`, defaults to `Template`.
+* New `ImplementationSettings` annotation arguments: `templateSuffix`, defaults to `Template`.
 * Immutable `ObjectModel` interface can be generated either from `ObjectTemplate` interface or skipped so Template itself can be ImmutableModel.
 * xref:model-annotations/src/main/kotlin/net/eraga/tools/models/GeneratedClass.kt[GeneratedClass] hints processor about properties of types that are generated from Template but not inherited from it.
 * `Comparable` implementation, see xref:model-annotations/src/main/kotlin/net/eraga/tools/models/ImplementComparable.kt[ImplementComparable] Annotation
@@ -26,6 +26,8 @@ New features and improvements:
 * Generate multiple implementations with annotation xref:model-annotations/src/main/kotlin/net/eraga/tools/models/Implementations.kt[Implementations].
 * Enforce to use named arguments in implementation class constructors, setting is ignored for data classes.
 //* TODO: Generate class to class convertors
+//* TODO: generate toString
+//* TODO: generate deepCopy
 //* TODO: Inherit annotations (select by package wildcard)
 //TODO: * Boilerplate classes for Spring Controller/Service/Repository in conjunction with DTO
 

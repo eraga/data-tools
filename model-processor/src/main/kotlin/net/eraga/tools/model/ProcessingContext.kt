@@ -27,7 +27,7 @@ import javax.lang.model.util.Types
 object ProcessingContext {
     val ignoreItClassName = ClassName("net.eraga.tools.models", "IgnoreIt")
 
-    lateinit var implementedModels: MutableList<ModelGenerator>
+    lateinit var implementedModels: MutableList<AbstractGenerator<*>>
 
     lateinit var classInspector: ClassInspector
         private set
@@ -52,10 +52,6 @@ object ProcessingContext {
         get() = processingEnv.elementUtils
 
     private val typeSpecs = LinkedHashMap<ClassName, TypeSpec>()
-
-    fun registerTypeSpec(className: ClassName, spec: TypeSpec) {
-        typeSpecs[className] = spec
-    }
 
     fun makeTypeSpec(typeName: TypeName): TypeSpec {
         if (typeName is ClassName) {

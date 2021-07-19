@@ -1,12 +1,6 @@
 package net.eraga.tools.models
 
 /**
- * Date: 12/07/2021
- * Time: 19:31
- * @author Klaus Schwartz <mailto:klaus@eraga.net>
- */
-
-/**
  * Default
  *
  * @param arrayComparing array equality expression, see [ArrayComparing]
@@ -14,7 +8,12 @@ package net.eraga.tools.models
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
  *
  *  Developed at [eRaga InfoSystems](https://www.eraga.net/)
+ *
+ * Date: 12/07/2021
+ * Time: 19:31
  */
-annotation class ImplementEquals(
+@Retention(AnnotationRetention.SOURCE)
+@Target(AnnotationTarget.CLASS)
+annotation class Equals(
     val arrayComparing: ArrayComparing = ArrayComparing.STRUCTURAL_RECURSIVE
 )

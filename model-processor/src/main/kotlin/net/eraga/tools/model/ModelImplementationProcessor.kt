@@ -5,11 +5,12 @@ import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.ClassInspector
+import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION_JPA
 import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION_DTO
-import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION_IMPLEMENTATIONS
-import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION_MODEL
+import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_ANNOTATION_IMMUTABLE
 import net.eraga.tools.model.typescript.TypeScriptGenerator
 import net.eraga.tools.models.*
+import net.eraga.tools.models.implement.DTOs
 import java.io.File
 import java.io.FileWriter
 import java.time.LocalDate
@@ -21,6 +22,7 @@ import javax.lang.model.element.*
 import javax.lang.model.util.Elements
 import javax.lang.model.util.Types
 import javax.tools.Diagnostic
+import kotlin.collections.HashSet
 
 /**
  * Date: 27/06/2018
@@ -29,23 +31,26 @@ import javax.tools.Diagnostic
 @DelicateKotlinPoetApi("")
 @KotlinPoetMetadataPreview
 @SupportedAnnotationTypes(
-        PROCESSED_ANNOTATION_MODEL,
-        PROCESSED_ANNOTATION_IMPLEMENTATIONS,
-        PROCESSED_ANNOTATION_DTO)
+        PROCESSED_ANNOTATION_IMMUTABLE,
+        PROCESSED_ANNOTATION_DTO,
+        PROCESSED_ANNOTATION_JPA)
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @SupportedOptions(
-        "kapt.typescript.generated", "kapt.kotlin.generated"
+        "kapt.typescript.generated",
+        "kapt.kotlin.generated"
 )
 class ModelImplementationProcessor : AbstractProcessor() {
-    companion object {
-        const val PROCESSED_ANNOTATION_MODEL = "net.eraga.tools.models.ImplementModel"
-        const val PROCESSED_ANNOTATION_IMPLEMENTATIONS = "net.eraga.tools.models.Implementations"
-        const val PROCESSED_ANNOTATION_DTO = "net.eraga.tools.models.ImplementDTOP"
-
-        val PROCESSED_ANNOTATIONS = arrayOf(
-                PROCESSED_ANNOTATION_MODEL,
-                PROCESSED_ANNOTATION_DTO
+    override fun getSupportedOptions(): Set<String> {
+        return setOf(
+                "kapt.typescript.generated",
+                "kapt.kotlin.generated"
         )
+    }
+
+    companion object {
+        const val PROCESSED_ANNOTATION_IMMUTABLE = "net.eraga.tools.models.Implement.Immutable"
+        const val PROCESSED_ANNOTATION_DTO = "net.eraga.tools.models.Implement.DTO"
+        const val PROCESSED_ANNOTATION_JPA = "net.eraga.tools.models.Implement.JPAEntity"
     }
 
     private val kotlinGenerated: String by lazy { processingEnv.options["kapt.kotlin.generated"]!! }
@@ -71,93 +76,129 @@ class ModelImplementationProcessor : AbstractProcessor() {
 
     @KotlinPoetMetadataPreview
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
-        if(annotations.isEmpty())
+        if (annotations.isEmpty())
             return false
+        val modelKeys = HashSet<TypeElement>()
+//        val implementTemplateElements = roundEnv.getElementsAnnotatedWith(ImplementationTemplates::class.java)
+//                .associateBy({ modelKeys.add(it as TypeElement); it }, {
+//                    it.getAnnotation(ImplementationTemplates::class.java).value.toMutableList()
+//                })
 
-        roundEnv.getElementsAnnotatedWith(Implementations::class.java).forEach {
-            it.getAnnotation(Implementations::class.java).value.forEach(::println)
-        }
+        val implementDtoElements = roundEnv.getElementsAnnotatedWith(DTOs::class.java)
+                .associateBy({ modelKeys.add(it as TypeElement); it }, {
+                    it.getAnnotation(DTOs::class.java).value.toMutableList()
+                })
+                .toMutableMap()
 
-        val modelElements = roundEnv.getElementsAnnotatedWith(Implementations::class.java)
-                .associateBy({ it as TypeElement }, {
-            it.getAnnotation(Implementations::class.java).value
-        })
-
-        ProcessingContext.implementedModels = mutableListOf<ModelGenerator>()
+        ProcessingContext.implementedModels = mutableListOf()
 
         /**
-         * Collect information about all models that we are about to implement
+         * Getting single DTO annotations
          */
-
-        val elements = annotations
-                .filter { it.qualifiedName.toString() in PROCESSED_ANNOTATIONS }
-                .map { roundEnv.getElementsAnnotatedWith(it) }
-                .flatten()
+        roundEnv.getElementsAnnotatedWith(Implement.DTO::class.java)
                 .filterIsInstance<TypeElement>()
+                .forEach {
+                    val list = implementDtoElements
+                            .getOrDefault(it, mutableListOf())
 
-        modelElements.forEach { (typeElement, implementations) ->
-            implementations.forEach { settings ->
-                ProcessingContext.implementedModels.add(
-                        ModelGenerator(
-                                typeElement,
-                                elements.map { it.qualifiedName.toString() },
-                                kotlinGenerated,
-                                implementModel = settings
-                        ))
-            }
-        }
-
-
-
-        if (elements.any()) {
-            File(kotlinGenerated).mkdirs()
-            elements.forEach { typeElement ->
-                val implementDTO = typeElement.getAnnotation(ImplementDTO::class.java)
-                val implementModel = typeElement.getAnnotation(ImplementModel::class.java)
-                if (typeElement.kind.isInterface) {
-//                    if (implementDTO != null) {
-//                        DTOGenerator(typeElement, elements.map { it.qualifiedName.toString() }, kotlinGenerated).run()
-//                    }
-
-                    if (implementModel != null) {
-                        ProcessingContext.implementedModels.add(
-                                ModelGenerator(
-                                        typeElement,
-                                        elements.map { it.qualifiedName.toString() },
-                                        kotlinGenerated,
-                                        implementModel = implementModel))
-                    } else {
-                        println(typeElement.toString())
-                    }
-
-                } else {
-                    messager.printMessage(
-                            Diagnostic.Kind.ERROR, "Only interfaces can be annotated with " +
-                            "${implementModel?.javaClass?.simpleName ?: ""} " +
-                            "${implementDTO?.javaClass?.simpleName ?: ""} " +
-                            " ${typeElement.qualifiedName} is ${typeElement.kind.name}"
-                    )
+                    list.add(it.getAnnotation(Implement.DTO::class.java))
+                    implementDtoElements[it] = list
                 }
-            }
+
+        /**
+         * Creating DTO generators
+         */
+        implementDtoElements.forEach { (typeElement, implementations) ->
+            ProcessingContext.implementedModels.add(
+                    DTOGenerator(
+                            implementations.map { settings ->
+                                DTOSettings(typeElement, settings)
+                            }
+                    ))
         }
+//        val elements = annotations
+//                .filter { it.qualifiedName.toString() in PROCESSED_ANNOTATIONS }
+//                .map { roundEnv.getElementsAnnotatedWith(it) }
+//                .flatten()
+//                .filterIsInstance<TypeElement>()
+
+
+//        if (elements.any()) {
+//            File(kotlinGenerated).mkdirs()
+//
+//            elements.forEach { annotationElement ->
+//                val implementModel = annotationElement.getAnnotation(ImplementationSettings::class.java)
+//                if (implementModel != null && annotationElement.kind == ElementKind.ANNOTATION_TYPE) {
+//                    roundEnv.getElementsAnnotatedWith(annotationElement)
+//                            .filterIsInstance<TypeElement>()
+//                            .forEach { nestedElement ->
+//                                ProcessingContext.implementedModels.add(
+//                                        ModelGenerator(
+//                                                ImmutableSettings(nestedElement, implementModel, null),
+//                                                kotlinGenerated))
+//                            }
+//                }
+//            }
+//
+//            elements.forEach { typeElement ->
+////                val implementDTO = typeElement.getAnnotation(ImplementDTO::class.java)
+//                val implementModel = typeElement.getAnnotation(ImplementationSettings::class.java)
+//                if (typeElement.kind.isInterface) {
+////                    if (implementDTO != null) {
+////                        DTOGenerator(typeElement, elements.map { it.qualifiedName.toString() }, kotlinGenerated).run()
+////                    }
+//
+//                    if (implementModel != null) {
+//                        if (typeElement.kind != ElementKind.ANNOTATION_TYPE) {
+//                            ProcessingContext.implementedModels.add(
+//                                    ModelGenerator(
+//                                            ImmutableSettings(typeElement, implementModel, null),
+//                                            kotlinGenerated))
+//                        }
+//                    } else {
+//                        println(typeElement.toString())
+//                    }
+//
+//                } else {
+//                    messager.printMessage(
+//                            Diagnostic.Kind.ERROR, "Only interfaces can be annotated with " +
+//                            "${implementModel?.javaClass?.simpleName ?: ""} " +
+////                            "${implementDTO?.javaClass?.simpleName ?: ""} " +
+//                            " ${typeElement.qualifiedName} is ${typeElement.kind.name}"
+//                    )
+//                }
+//            }
+//        }
 
         /**
          * Generate implementations for all models
          */
-        ProcessingContext.implementedModels.forEach {
-            it.run()
+        if (ProcessingContext.implementedModels.isNotEmpty()) {
+            val path = File(kotlinGenerated)
+            path.mkdirs()
+
+            ProcessingContext.implementedModels.forEach {
+                it.run()
+                it.generatedSpecs.forEach { spec ->
+                    spec.writeTo(path)
+                }
+            }
+
+            if (ProcessingContext.implementedModels.any { generator ->
+                        generator.listOfImplementations.any {
+                            it.constructorVarargPosition >= 0
+                        }
+                    })
+                generateIgnoreItClass()
         }
 
-        if(ProcessingContext.implementedModels.any { it.metadata.modelSettings.forceUseArgNamesInConstructor })
-            generateIgnoreItClass()
-
-        if(typescriptGenerated != null) {
-            val models = ProcessingContext.implementedModels
-                    .filter { it.classNameSpec != null }
-                    .map { it.classNameSpec!! }
-                    .toSet()
-            typescript(models, typescriptGenerated!!)
-        }
+//        if (typescriptGenerated != null) {
+//            val models = ProcessingContext.implementedModels
+//                    .filter { it.classNameSpec != null }
+//                    .map { it.classNameSpec!! }
+//                    .toSet()
+//            typescript(models, typescriptGenerated!!)
+//        }
 
         return true
     }

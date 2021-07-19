@@ -6,9 +6,9 @@ package net.eraga.tools.models
  */
 
 /**
- * Interface that makes model implement [Comparable].
+ * Interface that makes model implement [CompareTo].
  *
- * [ImplementComparable] annotation allows to tune generation settings for `override fun compareTo()`.
+ * [CompareTo] annotation allows to tune generation settings for `override fun compareTo()`.
  *
  * @param order of properties to compare, empty means default order will be used which is order if
  * class superinterfaces. Reverse order can be enforced my `-` sign before property name, e.g. ["-weight", "id"]
@@ -17,7 +17,7 @@ package net.eraga.tools.models
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.CLASS)
-annotation class ImplementComparable(
+annotation class CompareTo(
     val order: Array<String> = [],
     val compareAllProperties: Boolean = true
 )
