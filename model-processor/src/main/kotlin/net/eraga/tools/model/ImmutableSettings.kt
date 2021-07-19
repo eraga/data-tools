@@ -3,7 +3,6 @@ package net.eraga.tools.model
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import net.eraga.tools.models.*
-import java.util.*
 import javax.lang.model.element.NestingKind
 import javax.lang.model.element.TypeElement
 
@@ -26,7 +25,7 @@ class ImmutableSettings(
         implementAnnotation: Implement.Immutable)
     : AbstractSettings<Implement.Immutable>(modelElement, implementAnnotation) {
 
-    override fun kclassKind(): Kind = implementAnnotation.kind
+    override fun kclassKind(): Kind = ownSettings.kind
     override val implClassName: ClassName
 
     init {
@@ -36,7 +35,7 @@ class ImmutableSettings(
                 ClassName(
                         targetPackage,
                         implementAnnotation.prefix +
-                                modelSimpleName.removeSuffix(implSettings.modelSuffix) +
+                                modelSimpleName.removeSuffix(parentSettings.modelSuffix) +
                                 implementAnnotation.suffix
 
                 )
@@ -46,6 +45,9 @@ class ImmutableSettings(
                             "DTO annotation. Remove at class '${modelElement.qualifiedName}'")
 
         }
+
+        if(implementAnnotation.implementAnnotations.isNotBlank())
+            implementAnnotations = implementAnnotation.implementAnnotations
     }
 
 }

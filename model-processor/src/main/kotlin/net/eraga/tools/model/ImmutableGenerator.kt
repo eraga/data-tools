@@ -1,12 +1,10 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
-import java.util.*
 
 /**
  * **DTOGenerator**
@@ -86,10 +84,8 @@ class ImmutableGenerator(
                     type,
                     propertyData)
 
-            propertyData.propertySpec.annotations.forEach {
-                if(it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
-                    kotlinProperty.addAnnotation(it)
-            }
+            addAnnotations(propertyData, kotlinProperty, impl)
+
 
             if (impl.constructorVarargPosition == propertyNum)
                 constructorBuilder.addParameter(
@@ -185,7 +181,7 @@ class ImmutableGenerator(
             typeBuilder: TypeSpec.Builder
     ) {
         val propertySpecs = settings.typeSpec.propertySpecs
-        var param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
+        val param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
         val extToBuilder = FunSpec.builder("updateBy")
                 .addParameter(param, settings.implClassName)
 

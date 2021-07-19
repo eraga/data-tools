@@ -25,11 +25,14 @@ import kotlin.reflect.full.createInstance
 @KotlinPoetMetadataPreview
 abstract class AbstractSettings<T>(
         val modelElement: TypeElement,
-        val implementAnnotation: T
+        val ownSettings: T
 ) {
-    protected val implSettings: ImplementationSettings =
+    val parentSettings: ImplementationSettings =
             modelElement.getAnnotation(ImplementationSettings::class.java)
                     ?: ImplementationSettings::class.createInstance()
+
+    var implementAnnotations: String = parentSettings.implementAnnotations
+        protected set
 
     val primitiveInitializers =
             primitiveInitializersMap(modelElement.getAnnotation(PrimitiveInitializers::class.java))
@@ -51,9 +54,9 @@ abstract class AbstractSettings<T>(
     /**
      * Decided by ImplementationSettings
      */
-    val implementEquals: Boolean = implSettings.implEquals
-    val implementHashCode: Boolean = implSettings.implHashCode
-    val implementToString: Boolean = implSettings.implToString
+    val implementEquals: Boolean = parentSettings.implEquals
+    val implementHashCode: Boolean = parentSettings.implHashCode
+    val implementToString: Boolean = parentSettings.implToString
 
     val equalsSettings: Equals = modelElement.getAnnotation(Equals::class.java) ?: Equals::class.createInstance()
     val hashCodeSettings: HashCode = modelElement.getAnnotation(HashCode::class.java)
@@ -75,7 +78,7 @@ abstract class AbstractSettings<T>(
 //    TODO:
 //     val implementSerializable: Boolean
 
-    val constructorVarargPosition: Int = implSettings.forceArgNamesInConstructorSkip
+    val constructorVarargPosition: Int = parentSettings.forceArgNamesInConstructorSkip
 
     abstract fun kclassKind(): Kind
 

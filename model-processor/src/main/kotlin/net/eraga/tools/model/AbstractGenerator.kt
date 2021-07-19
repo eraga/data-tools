@@ -550,12 +550,21 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 //            spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
 //    }
 
+    fun addAnnotations(propertyData: PropertyData, kotlinProperty: PropertySpec.Builder, impl: AbstractSettings<*>) {
+        propertyData.propertySpec.annotations
+                .filter {
+                    impl.implementAnnotations.toRegex().matches(it.typeName.toString())
+                }
+                .forEach {
+                    if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
+                        kotlinProperty.addAnnotation(it)
+                }
+    }
+
     fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {
-        val pair = Pair(propertySpec.name, propertySpec.type)
         return if(spec.superinterfaces.isEmpty())
             spec.propertySpecs
-                    .map { Pair(it.name, it.type) }
-                    .contains(pair)
+                    .any{it.name == propertySpec.name}
         else
             spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
     }

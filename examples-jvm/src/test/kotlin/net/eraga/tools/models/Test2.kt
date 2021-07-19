@@ -17,8 +17,11 @@ import kotlin.Comparable
  *  Date: 18/07/2021
  *  Time: 21:13
  */
-interface WithID {
-    val id: Int
+interface WithAnyID {
+    val id: Any
+}
+interface WithIntID: WithAnyID {
+    override val id: Int
 }
 
 interface WithName {
@@ -29,13 +32,13 @@ interface WithSecondName {
     val secondName: String
 }
 
-interface WithIdAndName : WithID, WithName
+interface WithIdAndName : WithIntID, WithName
 
 @Implement.Immutable
 @Implement.DTO
 @Implement.DTO(suffix = "Update", propsForceNull = true)
 interface PersonModel :
-        WithID,
+        WithIntID,
         WithName,
         WithSecondName,
         WithIdAndName,
@@ -43,7 +46,7 @@ interface PersonModel :
         Cloneable,
         Serializable
 {
-    @get:Id
+    @ConstructorInitializer("10")
     override val id: Int
 
 

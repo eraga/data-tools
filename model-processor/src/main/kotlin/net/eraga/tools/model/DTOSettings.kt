@@ -41,7 +41,7 @@ class DTOSettings(
                 ClassName(
                         targetPackage,
                         implementAnnotation.prefix +
-                                modelSimpleName.removeSuffix(implSettings.modelSuffix) +
+                                modelSimpleName.removeSuffix(parentSettings.modelSuffix) +
                                 implementAnnotation.suffix + "DTO"
 
                 )
@@ -54,7 +54,7 @@ class DTOSettings(
 
                 ClassName(
                         targetPackage,
-                        modelSimpleName.removeSuffix(implSettings.modelSuffix) +
+                        modelSimpleName.removeSuffix(parentSettings.modelSuffix) +
                                 implementAnnotation.prefix +
                                 memberModelClassName!!.simpleName +
                                 implementAnnotation.suffix + "DTO"
@@ -68,10 +68,13 @@ class DTOSettings(
         }
 
         ProcessingContext.registerDTO(modelClassName, this)
+
+        if(implementAnnotation.implementAnnotations.isNotBlank())
+            implementAnnotations = implementAnnotation.implementAnnotations
     }
 
 
     override fun kclassKind(): Kind {
-        return implementAnnotation.kind
+        return ownSettings.kind
     }
 }

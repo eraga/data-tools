@@ -30,6 +30,7 @@ annotation class Implement {
      * @param kind of implementation class, default [Kind.FINAL_CLASS] see [Kind]
      * @param propsForceNull if true, will convert all properties to nullable
      * @param propsDefaultOmit if true, will implement only overridden properties
+     * @param implementAnnotations override of [ImplementationSettings.implementAnnotations]
      */
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")
@@ -43,6 +44,7 @@ annotation class Implement {
             val kind: Kind = Kind.FINAL_CLASS,
             val propsForceNull: Boolean = false,
             val propsDefaultOmit: Boolean = false,
+            val implementAnnotations: String = ""
     )
 
     /**
@@ -54,6 +56,7 @@ annotation class Implement {
      * @param prefix of implemented class, default empty
      * @param suffix of implemented class, default empty
      * @param kind of implementation class, default [Kind.OPEN_CLASS] see [Kind]
+     * @param implementAnnotations override of [ImplementationSettings.implementAnnotations]
      */
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")
@@ -64,7 +67,8 @@ annotation class Implement {
     annotation class Immutable(
             val prefix: String = "Immutable",
             val suffix: String = "",
-            val kind: Kind = Kind.FINAL_CLASS
+            val kind: Kind = Kind.FINAL_CLASS,
+            val implementAnnotations: String = ""
     )
 
     /**
@@ -82,5 +86,6 @@ annotation class Implement {
             val prefix: String = "",
             val suffix: String = "",
             val kind: Kind = Kind.FINAL_CLASS,
+            val implementAnnotations: String = ""
     )
 }

@@ -59,7 +59,7 @@ class DTOGenerator(
                 return spec.superinterfaces.all { supersHaveOnlyNullableProps(it.key.asTypeSpec()) }
             }
         }
-        val superinterfaces = if (impl.implementAnnotation.propsForceNull)
+        val superinterfaces = if (impl.ownSettings.propsForceNull)
             kmClassSpec.superinterfaces.keys.filter { typeName ->
                 supersHaveOnlyNullableProps(typeName.asTypeSpec())
             }.toMutableList()
@@ -106,7 +106,7 @@ class DTOGenerator(
             val defaultInit = propertyData.defaultInit
             val property = propertyData.typeSpec
 
-            val type = if (impl.implementAnnotation.propsForceNull)
+            val type = if (impl.ownSettings.propsForceNull)
                 determinePropertyType(element, propertyData).copy(nullable = true)
             else
                 determinePropertyType(element, propertyData)
@@ -133,10 +133,7 @@ class DTOGenerator(
 
 
 
-            propertyData.propertySpec.annotations.forEach {
-                if(it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
-                    kotlinProperty.addAnnotation(it)
-            }
+            addAnnotations(propertyData, kotlinProperty, impl)
 
             if (impl.constructorVarargPosition == propertyNum)
                 constructorBuilder.addParameter(
