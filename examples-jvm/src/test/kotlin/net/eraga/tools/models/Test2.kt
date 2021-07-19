@@ -43,11 +43,14 @@ interface PersonModel :
         Cloneable,
         Serializable
 {
+    @get:Id
+    override val id: Int
+
 
     @Implement.DTO
     private interface UpdateIdNameRequest : WithIdAndName
 
-    fun deepClone(): PersonModel
+//    fun deepClone(): PersonModel
 }
 
 class A(override val id: Int, override val name: String, override val secondName: String):PersonModel {
@@ -61,10 +64,10 @@ class A(override val id: Int, override val name: String, override val secondName
         return super.clone() as A
     }
 
-    override fun deepClone(): A {
-        val copy = super.clone() as A
-        return copy
-    }
+//    override fun deepClone(): A {
+//        val copy = super.clone() as A
+//        return copy
+//    }
 }
 
 @Implement.JPAEntity

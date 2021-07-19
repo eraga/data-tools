@@ -32,7 +32,10 @@ class DTOSettings(
     override val implClassName: ClassName
 
     init {
-        println(modelElement.nestingKind)
+        implementComparable = true
+        implementCloneable = true
+
+
         implClassName = when (modelElement.nestingKind) {
             NestingKind.TOP_LEVEL -> {
                 ClassName(
@@ -63,6 +66,8 @@ class DTOSettings(
                             "DTO annotation. Remove at class '${modelElement.qualifiedName}'")
 
         }
+
+        ProcessingContext.registerDTO(modelClassName, this)
     }
 
 

@@ -64,7 +64,7 @@ annotation class Implement {
     annotation class Immutable(
             val prefix: String = "Immutable",
             val suffix: String = "",
-            val kind: Kind = Kind.OPEN_CLASS
+            val kind: Kind = Kind.FINAL_CLASS
     )
 
     /**

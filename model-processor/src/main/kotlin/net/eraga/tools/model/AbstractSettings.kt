@@ -2,6 +2,7 @@ package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import net.eraga.tools.models.*
 import net.eraga.tools.models.CompareTo
@@ -63,9 +64,11 @@ abstract class AbstractSettings<T>(
     /**
      * Decided by presence of corresponding supertypes
      */
-    val implementComparable: Boolean = modelElement.implements(Comparable::class)
+    var implementComparable: Boolean = modelElement.implements(Comparable::class)
+        protected set
 
-    val implementCloneable: Boolean = modelElement.implements(Cloneable::class)
+    var implementCloneable: Boolean = modelElement.implements(Cloneable::class)
+        protected set
 
 //    TODO:
 //     abstract val implementDeepCloneable: Boolean
@@ -87,4 +90,9 @@ abstract class AbstractSettings<T>(
             )
         }
     }
+
+    /**
+     * Generated spec
+     */
+    lateinit var typeSpec: TypeSpec
 }

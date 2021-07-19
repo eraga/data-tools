@@ -28,6 +28,11 @@ import kotlin.NoSuchElementException
 abstract class AbstractGenerator<T : AbstractSettings<*>>(
         val listOfImplementations: List<T>
 ) : Runnable {
+    val IGNORED_ANNOTATIONS = listOf(
+            "java.lang.Override"
+    )
+
+
     protected val fileSpecs: MutableList<FileSpec> = mutableListOf()
 
     val generatedSpecs: List<FileSpec>
@@ -427,6 +432,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         return constructorBuilder
     }
 
+
     fun funModelExtensionToBuilder(
             settings: AbstractSettings<*>,
             propertySpecs: List<PropertySpec>
@@ -436,7 +442,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .returns(settings.implClassName)
         val funBodyBuilder = CodeBlock.builder()
 
-        if (propertySpecs.size > 0) {
+        if (propertySpecs.isNotEmpty()) {
             val props = propertySpecs.joinToString { "${it.name} = this.${it.name}" }
             funBodyBuilder.addStatement("return ${settings.implClassName.simpleName}(%L)", props)
         }
@@ -493,9 +499,30 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addFunction(compareToFun.build())
     }
 
-    fun implementComparable(
+    fun implementCloneable(
             settings: AbstractSettings<*>,
             typeBuilder: TypeSpec.Builder) {
+        val funBodyBuilder = CodeBlock.builder()
+                .add("return super.clone() as ${typeBuilder.build().name}")
+
+        val funBody = funBodyBuilder.build()
+
+        val compareToFun = FunSpec.builder("clone")
+                .returns(settings.implClassName)
+                .addModifiers(KModifier.OVERRIDE)
+                .addModifiers(KModifier.PUBLIC)
+                .addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
+    }
+
+
+    fun implementComparable(
+            settings: AbstractSettings<*>,
+            typeBuilder: TypeSpec.Builder,
+            compareTo: ClassName = settings.implClassName
+    ) {
         val funBodyBuilder =
                 funCompareToBuilder(typeBuilder.propertySpecs, settings.comparableSettings)
 
@@ -507,12 +534,29 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addParameter(
                         ParameterSpec.builder(
                                 "other",
-                                settings.implClassName
+                                compareTo
                         ).build()
                 )
                 .addCode(funBody)
 
         typeBuilder
                 .addFunction(compareToFun.build())
+    }
+
+//    fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {
+//        return if(spec.superinterfaces.isEmpty())
+//            spec.propertySpecs.contains(propertySpec)
+//        else
+//            spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
+//    }
+
+    fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {
+        val pair = Pair(propertySpec.name, propertySpec.type)
+        return if(spec.superinterfaces.isEmpty())
+            spec.propertySpecs
+                    .map { Pair(it.name, it.type) }
+                    .contains(pair)
+        else
+            spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
     }
 }

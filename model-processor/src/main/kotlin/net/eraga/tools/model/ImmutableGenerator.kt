@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
+import java.util.*
 
 /**
  * **DTOGenerator**
@@ -21,16 +22,16 @@ import net.eraga.tools.model.ProcessingContext.asTypeSpec
  *  Time: 19:02
  */
 @KotlinPoetMetadataPreview
-class DTOGenerator(
-        listOfImplementations: List<DTOSettings>
-) : AbstractGenerator<DTOSettings>(listOfImplementations) {
+class ImmutableGenerator(
+        listOfImplementations: List<ImmutableSettings>
+) : AbstractGenerator<ImmutableSettings>(listOfImplementations) {
     override fun generate() {
         for (implementation in listOfImplementations) {
             generateImplementation(implementation)
         }
     }
 
-    private fun generateImplementation(impl: DTOSettings) {
+    private fun generateImplementation(impl: ImmutableSettings) {
         val className = impl.implClassName
         val element = impl.modelElement
         val fileBuilder = FileSpec.builder(
@@ -44,53 +45,13 @@ class DTOGenerator(
         val kmClass = element.getAnnotation(Metadata::class.java)!!.toImmutableKmClass()
         val kmClassSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
 
-        /**
-         * DTO Classes don't inherit from model
-         */
-        fun supersHaveOnlyNullableProps(spec: TypeSpec): Boolean {
-            if(spec.superinterfaces.isEmpty()) {
-                if(spec.propertySpecs.isEmpty())
-                    return true
-                else
-                    if (spec.propertySpecs.all { it.type.isNullable })
-                        return true
-                return false
-            } else {
-                return spec.superinterfaces.all { supersHaveOnlyNullableProps(it.key.asTypeSpec()) }
-            }
-        }
-        val superinterfaces = if (impl.implementAnnotation.propsForceNull)
-            kmClassSpec.superinterfaces.keys.filter { typeName ->
-                supersHaveOnlyNullableProps(typeName.asTypeSpec())
-            }.toMutableList()
-        else
-            kmClassSpec.superinterfaces.keys.toMutableList()
+        kmClassSpec.superinterfaces.keys.first().asTypeSpec().superinterfaces
 
-        // Force Cloneable
-        if(superinterfaces.none { it == Cloneable::class.asTypeName() }) {
-            superinterfaces.add(Cloneable::class.asTypeName())
-        }
 
-        // Force Comparable
-        if(superinterfaces.none { it == Comparable::class.asTypeName() }) {
-            superinterfaces.add(Comparable::class.asTypeName().parameterizedBy(impl.implClassName))
-        }
+        val superinterfaces = listOf(impl.modelClassName)
 
         superinterfaces.forEach {
-            val type = if (it is ParameterizedTypeName) {
-                if (it.typeArguments.contains(impl.modelClassName)) {
-                    ClassName(it.rawType.packageName, it.rawType.simpleName).parameterizedBy(
-                            it.typeArguments.map { arg ->
-                                if (arg == impl.modelClassName) impl.implClassName else it
-                            }
-                    )
-                } else {
-                    it
-                }
-            } else {
-                it
-            }
-            typeBuilder.addSuperinterface(type)
+            typeBuilder.addSuperinterface(it)
         }
 
         /**
@@ -104,13 +65,8 @@ class DTOGenerator(
                 continue
 
             val defaultInit = propertyData.defaultInit
-            val property = propertyData.typeSpec
 
-            val type = if (impl.implementAnnotation.propsForceNull)
-                determinePropertyType(element, propertyData).copy(nullable = true)
-            else
-                determinePropertyType(element, propertyData)
-
+            val type = determinePropertyType(element, propertyData)
 
             val kotlinProperty = PropertySpec.builder(name, type)
                     .mutable(true)
@@ -119,19 +75,16 @@ class DTOGenerator(
                             .build()
                     )
 
-
-
             if (superinterfaces.any {
                         supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
                     })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
 
+
             val defaultValue = defaultInit ?: constructorDefaultInitializer(
                     impl,
                     type,
                     propertyData)
-
-
 
             propertyData.propertySpec.annotations.forEach {
                 if(it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
@@ -186,8 +139,19 @@ class DTOGenerator(
                         .callThisConstructor()
                         .build())
 
+        /**
+         * Extension to create instance from any instance inheriting model interface
+         */
+        val modelConstructorBuilder = funModelConstructorBuilder(
+                impl, typeBuilder.propertySpecs
+        )
+        typeBuilder
+                .addFunction(modelConstructorBuilder
+                        .callThisConstructor()
+                        .build())
+
         if (impl.implementComparable)
-            implementComparable(impl, typeBuilder)
+            implementComparable(impl, typeBuilder, impl.modelClassName)
 
         if (impl.implementCloneable)
             implementCloneable(impl, typeBuilder)
@@ -198,21 +162,45 @@ class DTOGenerator(
         if (impl.implementEquals)
             implementEquals(impl, typeBuilder)
 
+
 //      TODO:
 //        if(impl.implementToString)
 //            implementToString(typeBuilder)
 
-        impl.typeSpec = typeBuilder.build()
 
-        fileBuilder.addType(impl.typeSpec)
+        for (dtoImpl in ProcessingContext.listElementDTOs(impl.modelClassName)) {
+            funUpdateByBuilder(dtoImpl, typeBuilder)
+        }
 
-        /**
-         * Extension to create DTO instance from any class inheriting model interface
-         */
-        fileBuilder.addFunction(
-                funModelExtensionToBuilder(impl, typeBuilder.propertySpecs)
-                        .build())
+        fileBuilder.addType(typeBuilder.build())
 
         fileSpecs.add(fileBuilder.build())
+    }
+
+    /**
+     * Updates this class by data from other class
+     */
+    private fun funUpdateByBuilder(
+            settings: AbstractSettings<*>,
+            typeBuilder: TypeSpec.Builder
+    ) {
+        val propertySpecs = settings.typeSpec.propertySpecs
+        var param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
+        val extToBuilder = FunSpec.builder("updateBy")
+                .addParameter(param, settings.implClassName)
+
+        val funBodyBuilder = CodeBlock.builder()
+        for (prop in propertySpecs) {
+            if (prop.type.isNullable &&
+                    !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable) {
+                funBodyBuilder.beginControlFlow("if($param.${prop.name} != null)")
+                funBodyBuilder.add("this.${prop.name} = $param.${prop.name}!!\n")
+                funBodyBuilder.endControlFlow()
+            } else
+                funBodyBuilder.add("this.${prop.name} = $param.${prop.name}\n")
+        }
+
+        extToBuilder.addCode(funBodyBuilder.build())
+        typeBuilder.addFunction(extToBuilder.build())
     }
 }

@@ -9,6 +9,7 @@ import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.ClassInspector
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import javax.annotation.processing.ProcessingEnvironment
+import javax.lang.model.element.TypeElement
 import javax.lang.model.util.Elements
 import javax.lang.model.util.Types
 
@@ -121,5 +122,16 @@ object ProcessingContext {
             println("ERROR: ${className.canonicalName}: ${typeElement.getAnnotation(kotlinMetaClass) != null}")
             throw e
         }
+    }
+
+    private val DTOsByElement = HashMap<TypeName, MutableList<DTOSettings>>()
+    fun listElementDTOs(typeElement: TypeName): List<DTOSettings> {
+        return DTOsByElement.getOrDefault(typeElement, mutableListOf())
+    }
+
+    fun registerDTO(typeElement: TypeName, impl: DTOSettings) {
+        val list = DTOsByElement.getOrDefault(typeElement, mutableListOf())
+        list.add(impl)
+        DTOsByElement[typeElement] = list
     }
 }

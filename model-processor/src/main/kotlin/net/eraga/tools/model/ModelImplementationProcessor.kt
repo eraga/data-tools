@@ -11,6 +11,7 @@ import net.eraga.tools.model.ModelImplementationProcessor.Companion.PROCESSED_AN
 import net.eraga.tools.model.typescript.TypeScriptGenerator
 import net.eraga.tools.models.*
 import net.eraga.tools.models.implement.DTOs
+import net.eraga.tools.models.implement.Immutables
 import java.io.File
 import java.io.FileWriter
 import java.time.LocalDate
@@ -21,7 +22,6 @@ import javax.lang.model.SourceVersion
 import javax.lang.model.element.*
 import javax.lang.model.util.Elements
 import javax.lang.model.util.Types
-import javax.tools.Diagnostic
 import kotlin.collections.HashSet
 
 /**
@@ -83,32 +83,51 @@ class ModelImplementationProcessor : AbstractProcessor() {
 //                .associateBy({ modelKeys.add(it as TypeElement); it }, {
 //                    it.getAnnotation(ImplementationTemplates::class.java).value.toMutableList()
 //                })
+        ProcessingContext.implementedModels = mutableListOf()
 
-        val implementDtoElements = roundEnv.getElementsAnnotatedWith(DTOs::class.java)
+        /**
+         * Getting grouped annotations
+         */
+        val dtoElements = roundEnv.getElementsAnnotatedWith(DTOs::class.java)
                 .associateBy({ modelKeys.add(it as TypeElement); it }, {
                     it.getAnnotation(DTOs::class.java).value.toMutableList()
                 })
                 .toMutableMap()
 
-        ProcessingContext.implementedModels = mutableListOf()
+        val immutableElements = roundEnv.getElementsAnnotatedWith(Immutables::class.java)
+                .associateBy({ modelKeys.add(it as TypeElement); it }, {
+                    it.getAnnotation(Immutables::class.java).value.toMutableList()
+                })
+                .toMutableMap()
+
 
         /**
-         * Getting single DTO annotations
+         * Getting single annotations
          */
         roundEnv.getElementsAnnotatedWith(Implement.DTO::class.java)
                 .filterIsInstance<TypeElement>()
                 .forEach {
-                    val list = implementDtoElements
+                    val list = dtoElements
                             .getOrDefault(it, mutableListOf())
 
                     list.add(it.getAnnotation(Implement.DTO::class.java))
-                    implementDtoElements[it] = list
+                    dtoElements[it] = list
+                }
+
+        roundEnv.getElementsAnnotatedWith(Implement.Immutable::class.java)
+                .filterIsInstance<TypeElement>()
+                .forEach {
+                    val list = immutableElements
+                            .getOrDefault(it, mutableListOf())
+
+                    list.add(it.getAnnotation(Implement.Immutable::class.java))
+                    immutableElements[it] = list
                 }
 
         /**
-         * Creating DTO generators
+         * Creating generators
          */
-        implementDtoElements.forEach { (typeElement, implementations) ->
+        dtoElements.forEach { (typeElement, implementations) ->
             ProcessingContext.implementedModels.add(
                     DTOGenerator(
                             implementations.map { settings ->
@@ -116,59 +135,15 @@ class ModelImplementationProcessor : AbstractProcessor() {
                             }
                     ))
         }
-//        val elements = annotations
-//                .filter { it.qualifiedName.toString() in PROCESSED_ANNOTATIONS }
-//                .map { roundEnv.getElementsAnnotatedWith(it) }
-//                .flatten()
-//                .filterIsInstance<TypeElement>()
 
-
-//        if (elements.any()) {
-//            File(kotlinGenerated).mkdirs()
-//
-//            elements.forEach { annotationElement ->
-//                val implementModel = annotationElement.getAnnotation(ImplementationSettings::class.java)
-//                if (implementModel != null && annotationElement.kind == ElementKind.ANNOTATION_TYPE) {
-//                    roundEnv.getElementsAnnotatedWith(annotationElement)
-//                            .filterIsInstance<TypeElement>()
-//                            .forEach { nestedElement ->
-//                                ProcessingContext.implementedModels.add(
-//                                        ModelGenerator(
-//                                                ImmutableSettings(nestedElement, implementModel, null),
-//                                                kotlinGenerated))
-//                            }
-//                }
-//            }
-//
-//            elements.forEach { typeElement ->
-////                val implementDTO = typeElement.getAnnotation(ImplementDTO::class.java)
-//                val implementModel = typeElement.getAnnotation(ImplementationSettings::class.java)
-//                if (typeElement.kind.isInterface) {
-////                    if (implementDTO != null) {
-////                        DTOGenerator(typeElement, elements.map { it.qualifiedName.toString() }, kotlinGenerated).run()
-////                    }
-//
-//                    if (implementModel != null) {
-//                        if (typeElement.kind != ElementKind.ANNOTATION_TYPE) {
-//                            ProcessingContext.implementedModels.add(
-//                                    ModelGenerator(
-//                                            ImmutableSettings(typeElement, implementModel, null),
-//                                            kotlinGenerated))
-//                        }
-//                    } else {
-//                        println(typeElement.toString())
-//                    }
-//
-//                } else {
-//                    messager.printMessage(
-//                            Diagnostic.Kind.ERROR, "Only interfaces can be annotated with " +
-//                            "${implementModel?.javaClass?.simpleName ?: ""} " +
-////                            "${implementDTO?.javaClass?.simpleName ?: ""} " +
-//                            " ${typeElement.qualifiedName} is ${typeElement.kind.name}"
-//                    )
-//                }
-//            }
-//        }
+        immutableElements.forEach { (typeElement, implementations) ->
+            ProcessingContext.implementedModels.add(
+                    ImmutableGenerator(
+                            implementations.map { settings ->
+                                ImmutableSettings(typeElement, settings)
+                            }
+                    ))
+        }
 
         /**
          * Generate implementations for all models

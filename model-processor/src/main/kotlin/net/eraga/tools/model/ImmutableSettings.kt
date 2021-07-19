@@ -1,7 +1,10 @@
 package net.eraga.tools.model
 
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import net.eraga.tools.models.*
 import java.util.*
+import javax.lang.model.element.NestingKind
 import javax.lang.model.element.TypeElement
 
 /**
@@ -17,27 +20,32 @@ import javax.lang.model.element.TypeElement
  *  Date: 13/07/2021
  *  Time: 19:48
  */
+@KotlinPoetMetadataPreview
 class ImmutableSettings(
-        element: TypeElement,
-        templateSettings: ImplementationSettings
-)
-//    : AbstractSettings<ImplementationSettings>(element, templateSettings) {
-//
-//    val baseName = modelSimpleName.removeSuffix(templateSettings.modelSuffix)
-//    val mutableInterfaceName = "$baseName${templateSettings.mutable.suffix}"
-//    val immutableInterfaceName = "$baseName${templateSettings.immutable.suffix}"
-////    val implClassName = "$baseName${templateSettings.kclass.suffix}"
-//
-//    val dslFunctionName = implClassName.replaceFirstChar { it.lowercase(Locale.getDefault()) }
-//
-//
-//    override fun constructorVarargPosition(): Int {
-//        /**
-//         * Kotlin data classes don't support constructor varargs
-//         */
-//        if(implementAnnotation.kclass.kind == Kind.DATA)
-//            return -1
-//
-//        return if(implementAnnotation.forceUseArgNamesInConstructor) implementAnnotation.forceArgNamesInConstructorSkip else -1
-//    }
-//}
+        modelElement: TypeElement,
+        implementAnnotation: Implement.Immutable)
+    : AbstractSettings<Implement.Immutable>(modelElement, implementAnnotation) {
+
+    override fun kclassKind(): Kind = implementAnnotation.kind
+    override val implClassName: ClassName
+
+    init {
+        println(modelElement.nestingKind)
+        implClassName = when (modelElement.nestingKind) {
+            NestingKind.TOP_LEVEL -> {
+                ClassName(
+                        targetPackage,
+                        implementAnnotation.prefix +
+                                modelSimpleName.removeSuffix(implSettings.modelSuffix) +
+                                implementAnnotation.suffix
+
+                )
+            }
+            else -> throw IllegalArgumentException(
+                    "Nesting kind ${modelElement.nestingKind} is not supported by " +
+                            "DTO annotation. Remove at class '${modelElement.qualifiedName}'")
+
+        }
+    }
+
+}
