@@ -40,10 +40,10 @@ interface WithIdAndName : WithIntID, WithName
 @Implement.DTO
 @Implement.DTO(suffix = "Update", propsForceNull = true)
 interface PersonModel :
-        WithIntID,
         WithName,
         WithSecondName,
         WithIdAndName,
+
         Comparable<PersonModel>,
         Cloneable,
         Serializable {
@@ -52,16 +52,21 @@ interface PersonModel :
 //    @get:Id
     @Implement.Init("42")
     @Implement.Init("24", "PersonDTO")
-//    @Implement.Omit
-//    @Implement.Omit("PersonUpdateDTO")
-//    @Implement.Omit("PersonDTO")
+
+    @Implement.Omit("PersonDTO")
     override var id: Int
+
+    @Implement.Omit("PersonDTO")
+    override val name: String
+
+    @Implement.Omit("PersonDTO")
+    val nameOfPerson: String
 
     @Implement.DTO
     private class UpdateIdNameRequest() : WithIdAndName {
 
 //        @Implement.Omit("PersonUpdateIdNameRequestDTO")
-//        @Implement.Omit
+        @Implement.Omit
         @Implement.Init("42")
         override val id: Int = 0
         @Implement.Init("\"42\"")

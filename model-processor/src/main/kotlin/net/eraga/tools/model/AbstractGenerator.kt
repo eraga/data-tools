@@ -483,8 +483,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
     private fun supersWithoutTheseProps(type: TypeName, skippedPropSpecs: List<PropertySpec>): MutableList<TypeName> {
         val spec = type.asTypeSpec()
         var possibleSupers = mutableListOf<TypeName>()
-        val needsReplace = spec.propertySpecs
-                .any { superProp -> skippedPropSpecs.any { it.name == superProp.name } }
+        val needsReplace = skippedPropSpecs.any { supersHaveThisProp(spec, it)}
 
         if (needsReplace) {
             spec.superinterfaces.keys.forEach {
@@ -509,8 +508,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
         superinterfaces.forEach { typeName ->
             val spec = typeName.asTypeSpec()
-            val needsReplace = spec.propertySpecs
-                    .any { superProp -> skippedPropSpecs.any { it.name == superProp.name } }
+            val needsReplace = skippedPropSpecs.any { supersHaveThisProp(spec, it) }
 
             if (needsReplace) {
                 replaceWith[typeName] = supersWithoutTheseProps(typeName, skippedPropSpecs)
