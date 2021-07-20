@@ -4,6 +4,7 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import net.eraga.commons.Copiable
 import net.eraga.tools.models.*
 import net.eraga.tools.models.CompareTo
 import javax.lang.model.element.TypeElement
@@ -57,6 +58,7 @@ abstract class AbstractSettings<T>(
     val implementEquals: Boolean = parentSettings.implEquals
     val implementHashCode: Boolean = parentSettings.implHashCode
     val implementToString: Boolean = parentSettings.implToString
+    val implementCopy: Boolean = modelElement.implements(Copiable::class)
 
     val equalsSettings: Equals = modelElement.getAnnotation(Equals::class.java) ?: Equals::class.createInstance()
     val hashCodeSettings: HashCode = modelElement.getAnnotation(HashCode::class.java)

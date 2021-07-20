@@ -374,15 +374,19 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         val prebuiltType = typeBuilder.build()
 
         val funBodyBuilder = CodeBlock.builder()
-//        funBodyBuilder.add("\n")
         funBodyBuilder.add("return \"${prebuiltType.name}(\" + ")
         if (propertySpecs.size > 0) {
             funBodyBuilder.add("\n")
             funBodyBuilder.indent()
 
-            funBodyBuilder.add(propertySpecs.joinToString("\n") { "\"${it.name} = $${it.name}.toString() \" +" })
+            funBodyBuilder.add(propertySpecs.joinToString(", \" + \n") {
+                val isString = it.type == String::class.asTypeName()
+                val sq = if(isString) "\\\"" else ""
+                val toStr = if(isString) "" else ".toString()"
+                "\"${it.name} = $sq\${${it.name}$toStr}$sq"
+            })
 
-            funBodyBuilder.add("\n")
+            funBodyBuilder.add("\" + \n")
             funBodyBuilder.unindent()
         }
         funBodyBuilder.add("\")\"")
@@ -483,6 +487,54 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addFunction(compareToFun.build())
     }
 
+    fun implementCopiable(
+            typeBuilder: TypeSpec.Builder,
+            kclass: ClassName
+    ) {
+        val propertySpecs = typeBuilder.propertySpecs
+        val prebuiltType = typeBuilder.build()
+
+        val funBodyBuilder = CodeBlock.builder()
+
+        val compareToFun = FunSpec.builder("copy")
+                .returns(kclass)
+
+        funBodyBuilder.add("return ${prebuiltType.name}(")
+        if (propertySpecs.size > 0) {
+            funBodyBuilder.add("\n")
+            funBodyBuilder.indent()
+            for (prop in propertySpecs) {
+                val clone = if (kclass.implements("kotlin.Cloneable"))
+                    ".clone()"
+                else
+                    ""
+
+                compareToFun.addParameter(
+                        ParameterSpec.builder(
+                                prop.name,
+                                prop.type
+                        )
+                                .defaultValue("this.${prop.name}$clone")
+                                .build()
+                )
+            }
+            funBodyBuilder.add(propertySpecs.joinToString(",\n") { "${it.name} = ${it.name}" })
+
+            funBodyBuilder.add("\n")
+            funBodyBuilder.unindent()
+        }
+        funBodyBuilder.add(")")
+
+        val funBody = funBodyBuilder.build()
+
+
+        compareToFun.addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
+    }
+
+
     fun addAnnotations(propertyData: PropertyData, kotlinProperty: PropertySpec.Builder, impl: AbstractSettings<*>) {
         propertyData.propertySpec.annotations
                 .filter {
@@ -504,7 +556,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
     private fun supersWithoutTheseProps(type: TypeName, skippedPropSpecs: List<PropertySpec>): MutableList<TypeName> {
         val spec = type.asTypeSpec()
         var possibleSupers = mutableListOf<TypeName>()
-        val needsReplace = skippedPropSpecs.any { supersHaveThisProp(spec, it)}
+        val needsReplace = skippedPropSpecs.any { supersHaveThisProp(spec, it) }
 
         if (needsReplace) {
             spec.superinterfaces.keys.forEach {

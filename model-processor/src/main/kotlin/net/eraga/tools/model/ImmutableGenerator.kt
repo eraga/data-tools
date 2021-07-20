@@ -67,6 +67,19 @@ class ImmutableGenerator(
             typeBuilder.addSuperinterface(it)
         }
 
+        /**
+         * Class annotations
+         */
+        kmClassSpec.annotationSpecs
+                .filter {
+                    impl.implementAnnotations.toRegex().matches(it.typeName.toString())
+                }
+                .forEach {
+                    if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
+                        typeBuilder.addAnnotation(it)
+                }
+
+
         for ((_, propertyData) in gatheredProperties) {
             if (propertyData.preventOverride)
                 continue
@@ -186,6 +199,8 @@ class ImmutableGenerator(
         if (impl.implementToString)
             implementToString(typeBuilder)
 
+        if (impl.implementCopy)
+            implementCopiable(typeBuilder, impl.implClassName)
 
         for (dtoImpl in ProcessingContext.listElementDTOs(impl.modelClassName)) {
             funUpdateByBuilder(dtoImpl, typeBuilder)

@@ -2,6 +2,7 @@ package net.eraga.tools.models
 
 import java.io.Serializable
 import javax.persistence.Column
+import javax.persistence.Entity
 import javax.persistence.Id
 import kotlin.Comparable
 
@@ -37,23 +38,22 @@ interface WithSecondName {
 interface WithIdAndName : WithIntID, WithName
 
 @Implement.Immutable
+@Implement.Immutable("", implementAnnotations = "javax.persistence.*")
 @Implement.DTO
 @Implement.DTO(suffix = "Update", propsForceNull = true)
+@Entity
 interface PersonModel :
-        WithName,
-        WithSecondName,
         WithIdAndName,
+        WithSecondName,
 
         Comparable<PersonModel>,
         Cloneable,
         Serializable {
 
-//    @Deprecated("Test")
-//    @get:Id
-    @Implement.Init("42")
+    @get:Id
+    @Implement.Init("0")
     @Implement.Init("24", "PersonDTO")
-
-    @Implement.Omit("PersonDTO")
+    @Implement.Omit("PersonUpdateDTO")
     override var id: Int
 
     @Implement.Omit("PersonDTO")
@@ -64,16 +64,13 @@ interface PersonModel :
 
     @Implement.DTO
     private class UpdateIdNameRequest() : WithIdAndName {
-
-//        @Implement.Omit("PersonUpdateIdNameRequestDTO")
         @Implement.Omit
         @Implement.Init("42")
         override val id: Int = 0
+
         @Implement.Init("\"42\"")
         override val name: String = ""
     }
-
-//    fun deepClone(): PersonModel
 }
 
 
@@ -84,8 +81,15 @@ interface PersonJPAModel : PersonModel {
     override val secondName: String
 }
 
+data class Test2(
+        val a: String,
+        val b: String
+)
+
 fun main() {
     println("done")
 
-    val person = PersonDTO()
+    val person = Person()
+    val immutable = ImmutablePerson(person).clone()
+    val immutablePerson = immutable.toPersonUpdateDTO()
 }
