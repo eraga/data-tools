@@ -59,7 +59,7 @@ class ImmutableGenerator(
 
         val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
 
-        if(skippedProperties.isNotEmpty()) {
+        if (skippedProperties.isNotEmpty()) {
             superinterfaces = correctInheritanceChainFor(skippedProperties, superinterfaces)
         }
 
@@ -80,7 +80,7 @@ class ImmutableGenerator(
             val kotlinProperty = PropertySpec.builder(name, type)
                     .mutable(true)
 
-            if(propertyData.propertySpec.setter == null && !propertyData.propertySpec.mutable) {
+            if (propertyData.propertySpec.setter == null && !propertyData.propertySpec.mutable) {
                 kotlinProperty
                         .setter(FunSpec.setterBuilder()
                                 .addModifiers(KModifier.PRIVATE)
@@ -99,12 +99,12 @@ class ImmutableGenerator(
                     type,
                     propertyData)
 
-            val defaultValueLiteral = if(defaultValue.contains("\""))
+            val defaultValueLiteral = if (defaultValue.contains("\""))
                 "%S"
             else
                 "%L"
 
-            val defaultValueValue = if(defaultValue.contains("\""))
+            val defaultValueValue = if (defaultValue.contains("\""))
                 defaultValue.replace("\"", "")
             else
                 defaultValue
@@ -127,13 +127,13 @@ class ImmutableGenerator(
                             name,
                             type
                     )
-                            .defaultValue(defaultValueLiteral,defaultValueValue)
+                            .defaultValue(defaultValueLiteral, defaultValueValue)
                             .build()
             )
 
             typeBuilder.addProperty(
                     kotlinProperty
-                            .initializer(defaultValueLiteral,defaultValueValue)
+                            .initializer(defaultValueLiteral, defaultValueValue)
                             .build()
             )
             propertyNum++
@@ -183,10 +183,8 @@ class ImmutableGenerator(
         if (impl.implementEquals)
             implementEquals(impl, typeBuilder)
 
-
-//      TODO:
-//        if(impl.implementToString)
-//            implementToString(typeBuilder)
+        if (impl.implementToString)
+            implementToString(typeBuilder)
 
 
         for (dtoImpl in ProcessingContext.listElementDTOs(impl.modelClassName)) {

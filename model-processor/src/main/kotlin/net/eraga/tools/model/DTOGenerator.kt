@@ -220,9 +220,8 @@ class DTOGenerator(
         if (impl.implementEquals)
             implementEquals(impl, typeBuilder)
 
-//      TODO:
-//        if(impl.implementToString)
-//            implementToString(typeBuilder)
+        if(impl.implementToString)
+            implementToString(typeBuilder)
 
         impl.typeSpec = typeBuilder.build()
 

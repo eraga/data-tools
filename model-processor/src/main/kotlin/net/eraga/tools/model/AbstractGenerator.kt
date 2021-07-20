@@ -1,21 +1,17 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import com.squareup.kotlinpoet.metadata.hasAnnotations
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
-import kotlinx.metadata.*
-import kotlinx.metadata.Flag.Common.HAS_ANNOTATIONS
-import kotlinx.metadata.jvm.KotlinClassHeader
-import kotlinx.metadata.jvm.KotlinClassMetadata
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.*
-import net.eraga.tools.models.CompareTo
 import java.util.*
-import javax.lang.model.element.*
+import javax.lang.model.element.AnnotationMirror
+import javax.lang.model.element.Element
+import javax.lang.model.element.ElementKind
+import javax.lang.model.element.TypeElement
 import kotlin.NoSuchElementException
 
 /**
@@ -374,7 +370,32 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
 
     fun implementToString(typeBuilder: TypeSpec.Builder) {
+        val propertySpecs = typeBuilder.propertySpecs
+        val prebuiltType = typeBuilder.build()
 
+        val funBodyBuilder = CodeBlock.builder()
+//        funBodyBuilder.add("\n")
+        funBodyBuilder.add("return \"${prebuiltType.name}(\" + ")
+        if (propertySpecs.size > 0) {
+            funBodyBuilder.add("\n")
+            funBodyBuilder.indent()
+
+            funBodyBuilder.add(propertySpecs.joinToString("\n") { "\"${it.name} = $${it.name}.toString() \" +" })
+
+            funBodyBuilder.add("\n")
+            funBodyBuilder.unindent()
+        }
+        funBodyBuilder.add("\")\"")
+
+        val funBody = funBodyBuilder.build()
+
+        val compareToFun = FunSpec.builder("toString")
+                .returns(String::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode(funBody)
+
+        typeBuilder
+                .addFunction(compareToFun.build())
     }
 
     fun implementEquals(
