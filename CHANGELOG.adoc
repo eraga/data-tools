@@ -5,13 +5,29 @@ For an even more detailed look at what has changed, refer to the {uri-repo}/comm
 
 This project utilizes semantic versioning.
 
-== Next version 1.3.0 (TBD)
+== Next version 2.1.0 (TBD)
 
 New features and improvements:
 
-* Nested arrays support
+* Nested arrays support in property definitions, e.g. `val array = Array<Array<Int>`
+* Nested generics in type definitions support, e.g. `interface SomeModel : List<List<Int>>`
 
-== Next version 1.2.0 (TBD)
+== Version 2.0.0 (TBA)
+
+New features and improvements:
+
+* Completely reworked API
+** Generator annotations:
+*** `Implement.Immutable` for immutables that inherit from model
+*** `Implement.DTO` for immutables that don't inherit from model to be used as Data Transfer Objects
+//TODO:
+*** `Implement.JPAEntity`
+** Property annotations:
+*** `Implement.Omit(in = "ImplementationName")` will remove certain property from `ImplementationName`
+*** `Implement.Init(with = "")`
+
+
+== Version 1.2.0 (2021.07.17)
 
 New features and improvements:
 

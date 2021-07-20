@@ -51,9 +51,9 @@ interface PersonModel :
 //    @Deprecated("Test")
 //    @get:Id
     @ConstructorInitializer("42")
-    @Implement.Omit
-    @Implement.Omit("PersonUpdateDTO")
-    @Implement.Omit("PersonDTO")
+//    @Implement.Omit
+//    @Implement.Omit("PersonUpdateDTO")
+//    @Implement.Omit("PersonDTO")
     override var id: Int
 
     @Implement.DTO
@@ -61,8 +61,9 @@ interface PersonModel :
 
 //        @Implement.Omit("PersonUpdateIdNameRequestDTO")
 //        @Implement.Omit
+        @ConstructorInitializer("42")
         override val id: Int = 0
-
+        @ConstructorInitializer("\"42\"")
         override val name: String = ""
     }
 

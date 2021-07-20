@@ -84,13 +84,14 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             val propName = propertySpec.name
             val defaultInit = annotations.getValueOrNull(ConstructorInitializer::class, "value") as String?
 
-            val skip = annotations.hasValueOf(Implement.Omit::class, "*", "in") ||
+            val skip = annotations.hasValueOf(Implement.Omit::class, "", "in") ||
                     annotations.hasValueOf(Implement.Omit::class, implClassName.simpleName, "in")
 
-            if (implClassName.simpleName == "PersonDTO" &&
+            if (implClassName.simpleName.contains("ImmutablePerson") &&
                     propName == "id" &&
                     level == 0) {
                 println("At element: ${element.simpleName}:")
+                annotations.hasValueOf(Implement.Omit::class, "", "in")
                 println("   $implClassName:$propName !!!!PASS!!!!: $skip")
                 println("   prop: ${annotations.map { it.typeName }}")
                 println("   gett: ${propertySpec.getter?.annotations?.map { it.typeName }}")

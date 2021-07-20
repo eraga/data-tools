@@ -91,6 +91,10 @@ private class AnnotationSpecVisitor(
         }
 }
 
+class AnnotationSpecMap(
+        val map: Map<String, Any>
+)
+
 @KotlinPoetMetadataPreview
 fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val className = ClassName.bestGuess(annotationType.toString())
@@ -104,7 +108,6 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
         null
 
     val result = mutableListOf<AnnotationSpec>()
-
     /**
      * Extract repeatable annotations from containers
      */
@@ -130,7 +133,12 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
         }
     }
 
-    val builder = AnnotationSpec.builder(className).tag(this)
+    val map: MutableMap<String, Any> = mutableMapOf()
+
+    val builder = AnnotationSpec.builder(className)
+            .tag(this)
+            .tag(AnnotationSpecMap(map))
+
     kclass.memberProperties.forEach {
         val member = CodeBlock.builder()
         val name = it.name
@@ -140,13 +148,16 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
             val visitor = AnnotationSpecVisitor(member)
             val value = elementValues[key]!!
             value.accept(visitor, name)
+            map[name] = value.value
         } else {
             // Try to fill annotation with default values if there was no-arg constructor
 //            val visitor = KmProperty()
 //            kmClass.properties.first { prop->prop.name == it.name }.accept(visitor)
             if (instance != null) {
                 member.add("%L = ", name)
-                member.add("%L", it.getter.call(instance))
+                val value: Any = it.getter.call(instance)!!
+                member.add("%L", value)
+                map[name] = value
             }
         }
         builder.addMember(member.build())
@@ -155,10 +166,10 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     return result.apply { add(builder.build()) }
 }
 
-fun List<AnnotationSpec>.of(kclass: KClass<out Annotation>): List<AnnotationMirror> {
+fun List<AnnotationSpec>.of(kclass: KClass<out Annotation>): List<AnnotationSpec> {
     return filter {
         it.typeName == kclass.asTypeName()
-    }.map { it.tags.values.first() as AnnotationMirror }
+    }
 }
 
 /**
@@ -172,12 +183,14 @@ fun List<AnnotationSpec>.has(
 
 
 fun List<AnnotationSpec>.getValueOrNull(
-        kclass: KClass<out Annotation>, name: String = "value"): Any? {
+        kclass: KClass<out Annotation>,
+        name: String = "value"
+): Any? {
     val annotation = of(kclass).singleOrNull() ?: return null
-    val key = annotation.elementValues.keys
-            .firstOrNull { it.simpleName.toString() == name } ?: return null
+    val values = annotation.tag(AnnotationSpecMap::class)!!.map
+    val key = values.keys.firstOrNull { it == name } ?: return null
 
-    return annotation.elementValues[key]!!.value
+    return values[key]!!
 }
 
 fun List<AnnotationSpec>.hasValueOf(
@@ -194,12 +207,11 @@ fun List<AnnotationSpec>.hasValueOf(
      * Check if we have any annotations with this value
      */
     val first = of(kclass).firstOrNull { annotation ->
-        val key = annotation.elementValues.keys
-                .firstOrNull { it.simpleName.toString() == name }
-        if (key != null)
-            annotation.elementValues[key]!!.value == value
-        else
-            false
+        val values = annotation.tag(AnnotationSpecMap::class)!!.map
+        val key = values.keys.firstOrNull { it == name }
+                ?: return@firstOrNull false
+
+        values[key]!! == value
     }
     if (first != null)
         return true

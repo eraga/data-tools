@@ -100,10 +100,25 @@ annotation class Implement {
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")
     @java.lang.annotation.Repeatable(Omitted::class)
-    @Target(AnnotationTarget.PROPERTY, AnnotationTarget.PROPERTY_GETTER)
+    @Target(AnnotationTarget.PROPERTY)
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
-    annotation class Omit(val `in`: String = "*")
+    annotation class Omit(val `in`: String = "")
 
     annotation class Omitted(vararg val value: Omit)
+
+
+    /**
+     *
+     */
+    @Target(AnnotationTarget.PROPERTY)
+    @Retention(AnnotationRetention.SOURCE)
+    annotation class Init(
+            val with: String,
+            vararg val scopes: InitScope = []
+    )
+
+    enum class InitScope {
+        PROPERTY, PRIMARY_CONSTRUCTOR, SECONDARY_CONSTRUCTOR
+    }
 }
