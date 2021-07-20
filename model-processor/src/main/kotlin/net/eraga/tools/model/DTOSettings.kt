@@ -35,7 +35,6 @@ class DTOSettings(
         implementComparable = true
         implementCloneable = true
 
-
         implClassName = when (modelElement.nestingKind) {
             NestingKind.TOP_LEVEL -> {
                 ClassName(
@@ -47,7 +46,6 @@ class DTOSettings(
                 )
             }
             NestingKind.MEMBER -> {
-                println(modelClassName.canonicalName)
                 memberModelClassName = modelClassName
                 modelClassName = ClassName.bestGuess(targetPackage)
                 targetPackage = modelClassName.packageName

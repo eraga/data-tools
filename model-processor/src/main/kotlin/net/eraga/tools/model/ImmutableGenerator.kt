@@ -46,11 +46,8 @@ class ImmutableGenerator(
         kmClassSpec.superinterfaces.keys.first().asTypeSpec().superinterfaces
 
 
-        val superinterfaces = listOf(impl.modelClassName)
+        var superinterfaces = mutableListOf<TypeName>(impl.modelClassName)
 
-        superinterfaces.forEach {
-            typeBuilder.addSuperinterface(it)
-        }
 
         /**
          * Gather properties and create constructor
@@ -58,9 +55,23 @@ class ImmutableGenerator(
         val constructorBuilder = FunSpec.constructorBuilder()
 
         var propertyNum = 0
-        for ((name, propertyData) in gatherProperties(element)) {
+        val gatheredProperties = gatherProperties(element, impl.implClassName)
+
+        val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
+
+        if(skippedProperties.isNotEmpty()) {
+            superinterfaces = correctInheritanceChainFor(skippedProperties, superinterfaces)
+        }
+
+        superinterfaces.forEach {
+            typeBuilder.addSuperinterface(it)
+        }
+
+        for ((_, propertyData) in gatheredProperties) {
             if (propertyData.preventOverride)
                 continue
+
+            val name = propertyData.propertySpec.name
 
             val defaultInit = propertyData.defaultInit
 
@@ -68,10 +79,14 @@ class ImmutableGenerator(
 
             val kotlinProperty = PropertySpec.builder(name, type)
                     .mutable(true)
-                    .setter(FunSpec.setterBuilder()
-                            .addModifiers(KModifier.PRIVATE)
-                            .build()
-                    )
+
+            if(propertyData.propertySpec.setter == null && !propertyData.propertySpec.mutable) {
+                kotlinProperty
+                        .setter(FunSpec.setterBuilder()
+                                .addModifiers(KModifier.PRIVATE)
+                                .build()
+                        )
+            }
 
             if (superinterfaces.any {
                         supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
@@ -83,6 +98,16 @@ class ImmutableGenerator(
                     impl,
                     type,
                     propertyData)
+
+            val defaultValueLiteral = if(defaultValue.contains("\""))
+                "%S"
+            else
+                "%L"
+
+            val defaultValueValue = if(defaultValue.contains("\""))
+                defaultValue.replace("\"", "")
+            else
+                defaultValue
 
             addAnnotations(propertyData, kotlinProperty, impl)
 
@@ -102,13 +127,13 @@ class ImmutableGenerator(
                             name,
                             type
                     )
-                            .defaultValue(defaultValue)
+                            .defaultValue(defaultValueLiteral,defaultValueValue)
                             .build()
             )
 
             typeBuilder.addProperty(
                     kotlinProperty
-                            .initializer(defaultValue)
+                            .initializer(defaultValueLiteral,defaultValueValue)
                             .build()
             )
             propertyNum++

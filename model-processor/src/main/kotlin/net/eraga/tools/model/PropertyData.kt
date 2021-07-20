@@ -20,8 +20,6 @@ import javax.lang.model.element.ExecutableElement
  */
 @KotlinPoetMetadataPreview
 class PropertyData(
-    val getter: ExecutableElement,
-    val typeSpec: ImmutableKmProperty,
     val defaultInit: String?,
     val preventOverride: Boolean,
     val isInherited: Boolean,

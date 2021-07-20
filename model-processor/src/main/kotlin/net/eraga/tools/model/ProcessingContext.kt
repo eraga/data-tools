@@ -36,7 +36,7 @@ object ProcessingContext {
     private var processingEnvInternal: ProcessingEnvironment? = null
         set(value) {
             field = value
-            classInspector = ElementsClassInspector.create(elements, types)
+            classInspector = ForkedElementsClassInspector.create(elements, types)
         }
 
     fun setProcessingEnv(value: ProcessingEnvironment) {
@@ -105,7 +105,6 @@ object ProcessingContext {
 
         val typeElement = elements.getTypeElement(className.canonicalName)
 
-        val kotlinMetaClass = Class.forName("kotlin.Metadata").asSubclass(Annotation::class.java)
         if(typeElement == null) {
 //            println("WARNING: ${className.canonicalName}: ${typeElement?.getAnnotation(kotlinMetaClass) != null}")
 //            print("INFO: ")
@@ -119,7 +118,7 @@ object ProcessingContext {
             typeSpecs[className] = typeSpec
             return typeSpec
         } catch (e: Exception) {
-            println("ERROR: ${className.canonicalName}: ${typeElement.getAnnotation(kotlinMetaClass) != null}")
+            println("ERROR: ${className.canonicalName}: ${typeElement.getAnnotation(Metadata::class.java) != null}")
             throw e
         }
     }

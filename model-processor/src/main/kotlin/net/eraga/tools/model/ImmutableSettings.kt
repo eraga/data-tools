@@ -29,7 +29,6 @@ class ImmutableSettings(
     override val implClassName: ClassName
 
     init {
-        println(modelElement.nestingKind)
         implClassName = when (modelElement.nestingKind) {
             NestingKind.TOP_LEVEL -> {
                 ClassName(

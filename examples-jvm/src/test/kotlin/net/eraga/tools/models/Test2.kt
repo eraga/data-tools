@@ -1,6 +1,7 @@
 package net.eraga.tools.models
 
 import java.io.Serializable
+import javax.persistence.Column
 import javax.persistence.Id
 import kotlin.Comparable
 
@@ -20,7 +21,8 @@ import kotlin.Comparable
 interface WithAnyID {
     val id: Any
 }
-interface WithIntID: WithAnyID {
+
+interface WithIntID : WithAnyID {
     override val id: Int
 }
 
@@ -44,49 +46,39 @@ interface PersonModel :
         WithIdAndName,
         Comparable<PersonModel>,
         Cloneable,
-        Serializable
-{
-    @ConstructorInitializer("10")
-    override val id: Int
+        Serializable {
 
+//    @Deprecated("Test")
+//    @get:Id
+    @ConstructorInitializer("42")
+    @Implement.Omit
+    @Implement.Omit("PersonUpdateDTO")
+    @Implement.Omit("PersonDTO")
+    override var id: Int
 
     @Implement.DTO
-    private interface UpdateIdNameRequest : WithIdAndName
+    private class UpdateIdNameRequest() : WithIdAndName {
+
+//        @Implement.Omit("PersonUpdateIdNameRequestDTO")
+//        @Implement.Omit
+        override val id: Int = 0
+
+        override val name: String = ""
+    }
 
 //    fun deepClone(): PersonModel
 }
 
-class A(override val id: Int, override val name: String, override val secondName: String):PersonModel {
-
-    override fun compareTo(other: PersonModel): Int {
-        clone()
-        throw UnsupportedOperationException("not implemented") //TODO
-    }
-
-    public override fun clone(): A {
-        return super.clone() as A
-    }
-
-//    override fun deepClone(): A {
-//        val copy = super.clone() as A
-//        return copy
-//    }
-}
 
 @Implement.JPAEntity
 interface PersonJPAModel : PersonModel {
-    @get:Id
-    val `$id`: Int?
-    override val id: Int
-        get() = `$id`!!
+    override var id: Int
     override val name: String
     override val secondName: String
 }
 
 fun main() {
     println("done")
-    val a = A(0,"0,0", "")
-    a.clone()
 
     val person = PersonDTO()
 }

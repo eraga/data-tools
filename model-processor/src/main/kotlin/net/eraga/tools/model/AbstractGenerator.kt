@@ -1,16 +1,21 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.hasAnnotations
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import kotlinx.metadata.*
+import kotlinx.metadata.Flag.Common.HAS_ANNOTATIONS
+import kotlinx.metadata.jvm.KotlinClassHeader
+import kotlinx.metadata.jvm.KotlinClassMetadata
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.*
 import net.eraga.tools.models.CompareTo
 import java.util.*
 import javax.lang.model.element.*
-import javax.lang.model.type.TypeKind
 import kotlin.NoSuchElementException
 
 /**
@@ -49,145 +54,60 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
     fun gatherProperties(
             element: TypeElement,
-            level: Int = 0): Map<String, PropertyData> {
+            implClassName: ClassName,
+            level: Int = 0
+    ): Map<String, PropertyData> {
         val getters = LinkedHashMap<String, PropertyData>()
 
         for (iface in element.interfaces) {
             val realElement = ProcessingContext.types.asElement(iface)
 
             if (realElement is TypeElement) {
-                getters.putAll(gatherProperties(realElement, level + 1))
+                getters.putAll(gatherProperties(realElement, implClassName, level + 1))
             }
         }
 
         val metadata = element.getAnnotation(Metadata::class.java)
         if (metadata == null) {
-            println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
+//            println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
             return getters
         }
-        val onlyGetter: (ExecutableElement, String) -> Boolean = { ele: ExecutableElement, propName: String ->
-            ele.parameters.isEmpty() && ele.returnType.kind != TypeKind.VOID &&
-                    ele.simpleName.toString().lowercase().replace(propName.lowercase(), "")
-                            .replace("get", "").isBlank()
-
-//            !ele.simpleName.toString().lowercase().replace(propName.lowercase(), "")
-//                    .startsWith("set")
-        }
-
 
         val kmClass = metadata.toImmutableKmClass()
         val typeSpec = kmClass.toTypeSpec(
                 ProcessingContext.classInspector
         )
 
-        var propertyInitMap: Map<String, String>? = null
-        var preventOverridesMap: Map<String, Boolean>? = null
+        typeSpec.propertySpecs.forEach { propertySpec ->
+            val annotations = propertySpec.annotations //+ (propertySpec.getter?.annotations ?: emptySet())
 
-        val isConstructorInitializer = { mirror: AnnotationMirror ->
-            mirror.annotationType.asElement().simpleName.toString() == ConstructorInitializer::class.java.simpleName
-        }
-        val isPreventOverride = { mirror: AnnotationMirror ->
-            mirror.annotationType.asElement().simpleName.toString() == PreventOverride::class.java.simpleName
-        }
+            val propName = propertySpec.name
+            val defaultInit = annotations.getValueOrNull(ConstructorInitializer::class, "value") as String?
 
-        val annotationFilterPredicate = { mirror: AnnotationMirror ->
-            isPreventOverride(mirror) ||
-                    isConstructorInitializer(mirror)
-        }
+            val skip = annotations.hasValueOf(Implement.Omit::class, "*", "in") ||
+                    annotations.hasValueOf(Implement.Omit::class, implClassName.simpleName, "in")
 
-        if (typeSpec.kind == TypeSpec.Kind.INTERFACE) {
-            try {
-                val annotatedProps: List<Element>? = element
-                        .enclosedElements
-                        .first {
-                            it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
-                        }
-                        .enclosedElements
-                        ?.filter {
-                            it.simpleName.contains("annotations") &&
-                                    it.annotationMirrors.any { mirror ->
-                                        annotationFilterPredicate(mirror)
-                                    }
-                        }
-
-
-                propertyInitMap = annotatedProps?.filter {
-                    it.annotationMirrors.any { mirror ->
-                        isConstructorInitializer(mirror)
-                    }
-                }?.associateBy({
-                    it.simpleName.split("$").first()
-                }, {
-                    it.annotationMirrors
-                            .first { mirror ->
-                                isConstructorInitializer(mirror)
-                            }
-                            .elementValues
-                            .values
-                            .first()
-                            .value
-                            .toString()
-                })
-
-
-                preventOverridesMap = annotatedProps?.filter {
-                    it.annotationMirrors.any { mirror ->
-                        isPreventOverride(mirror)
-                    }
-                }?.associateBy({
-                    it.simpleName.split("$").first()
-                }, {
-                    true
-                })
-
-            } catch (_: NoSuchElementException) {
+            if (implClassName.simpleName == "PersonDTO" &&
+                    propName == "id" &&
+                    level == 0) {
+                println("At element: ${element.simpleName}:")
+                println("   $implClassName:$propName !!!!PASS!!!!: $skip")
+                println("   prop: ${annotations.map { it.typeName }}")
+                println("   gett: ${propertySpec.getter?.annotations?.map { it.typeName }}")
+//                val regex = "@java.lang.annotation.Repeatable\\(value=interface (.*)\\)".toRegex()
+//                val filtered = Implement.Omit::class.annotations.filter {
+//                    regex.matches(it.toString())
+//                }.map { regex.find(it.toString())!!.groupValues[1].replace("$", ".") }
+//                println("   ${filtered}")
             }
+
+            getters[propName] = PropertyData(
+                    defaultInit,
+                    skip,
+                    level > 0,
+                    typeSpec.propertySpecs.first { it.name == propName }
+            )
         }
-
-        val propNames = kmClass.properties.map { it.name }
-        val findPropByName = { name: String ->
-            try {
-                kmClass.properties.first { it.name == name }
-            } catch (e: Exception) {
-                throw IllegalStateException("Caught Exception when iterating ${kmClass.properties.map { it.name }} " +
-                        "and searching '$name' in class ${element.qualifiedName}", e)
-            }
-        }
-        val findPropName = { ele: ExecutableElement ->
-            propNames.first {
-                val results = arrayOf("get", "set", "")
-                ele.simpleName.toString().lowercase().replaceFirst(it.lowercase(), "") in results
-            }
-        }
-
-
-
-        element.enclosedElements
-                .filterIsInstance<ExecutableElement>()
-//                .associateBy(findPropName)
-                .filter {
-                    try {
-                        findPropName(it)
-                        true
-                    } catch (e: NoSuchElementException) {
-                        false
-                    }
-                }
-                .filter { onlyGetter(it, findPropName(it)) }
-                .forEach { getter ->
-                    val propName = findPropName(getter)
-                    getters[propName] = PropertyData(
-                            getter,
-                            findPropByName(propName),
-                            propertyInitMap?.getOrDefault(getter.simpleName.toString(), null),
-                            preventOverridesMap?.getOrDefault(getter.simpleName.toString(), null) ?: false,
-                            level > 0,
-                            typeSpec.propertySpecs.first { it.name == propName }
-                    )
-//                    println("$level: ${it.simpleName} (${it.kind})")
-                }
-
-//        getters.forEach { (k, _) -> println("$level: $k") }
         return getters
     }
 
@@ -453,9 +373,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
     }
 
 
-
     fun implementToString(typeBuilder: TypeSpec.Builder) {
-        throw UnsupportedOperationException("not implemented") //TODO
+
     }
 
     fun implementEquals(
@@ -543,13 +462,6 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addFunction(compareToFun.build())
     }
 
-//    fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {
-//        return if(spec.superinterfaces.isEmpty())
-//            spec.propertySpecs.contains(propertySpec)
-//        else
-//            spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
-//    }
-
     fun addAnnotations(propertyData: PropertyData, kotlinProperty: PropertySpec.Builder, impl: AbstractSettings<*>) {
         propertyData.propertySpec.annotations
                 .filter {
@@ -562,10 +474,64 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
     }
 
     fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {
-        return if(spec.superinterfaces.isEmpty())
-            spec.propertySpecs
-                    .any{it.name == propertySpec.name}
-        else
-            spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
+        if (spec.propertySpecs.any { it.name == propertySpec.name })
+            return true
+
+        return spec.superinterfaces.any { supersHaveThisProp(it.key.asTypeSpec(), propertySpec) }
+    }
+
+    private fun supersWithoutTheseProps(type: TypeName, skippedPropSpecs: List<PropertySpec>): MutableList<TypeName> {
+        val spec = type.asTypeSpec()
+        var possibleSupers = mutableListOf<TypeName>()
+        val needsReplace = spec.propertySpecs
+                .any { superProp -> skippedPropSpecs.any { it.name == superProp.name } }
+
+        if (needsReplace) {
+            spec.superinterfaces.keys.forEach {
+                possibleSupers.addAll(supersWithoutTheseProps(it, skippedPropSpecs))
+            }
+        } else {
+            possibleSupers = mutableListOf(type)
+        }
+        return possibleSupers
+    }
+
+    /**
+     * Do not inherit from [superinterfaces] that have declared any of [skippedProperties]
+     */
+    fun correctInheritanceChainFor(
+            skippedProperties: Map<String, PropertyData>,
+            superinterfaces: MutableList<TypeName>): MutableList<TypeName> {
+
+        val skippedPropSpecs = skippedProperties.values.map { it.propertySpec }
+
+        val replaceWith: MutableMap<TypeName, MutableList<TypeName>> = mutableMapOf()
+
+        superinterfaces.forEach { typeName ->
+            val spec = typeName.asTypeSpec()
+            val needsReplace = spec.propertySpecs
+                    .any { superProp -> skippedPropSpecs.any { it.name == superProp.name } }
+
+            if (needsReplace) {
+                replaceWith[typeName] = supersWithoutTheseProps(typeName, skippedPropSpecs)
+            }
+        }
+
+        if (replaceWith.isEmpty()) {
+            return superinterfaces
+        }
+
+        val correctedSupers = mutableListOf<TypeName>()
+
+        superinterfaces.forEach { superType ->
+            if (superType in replaceWith.keys)
+                correctedSupers.addAll(replaceWith[superType]!!)
+            else
+                correctedSupers.add(superType)
+
+        }
+
+        return correctedSupers
+
     }
 }

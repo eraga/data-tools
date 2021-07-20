@@ -32,6 +32,7 @@ class DTOGenerator(
 
     private fun generateImplementation(impl: DTOSettings) {
         val className = impl.implClassName
+        println("           STARTING impl $className")
         val element = impl.modelElement
         val fileBuilder = FileSpec.builder(
                 className.packageName,
@@ -48,8 +49,8 @@ class DTOGenerator(
          * DTO Classes don't inherit from model
          */
         fun supersHaveOnlyNullableProps(spec: TypeSpec): Boolean {
-            if(spec.superinterfaces.isEmpty()) {
-                if(spec.propertySpecs.isEmpty())
+            if (spec.superinterfaces.isEmpty()) {
+                if (spec.propertySpecs.isEmpty())
                     return true
                 else
                     if (spec.propertySpecs.all { it.type.isNullable })
@@ -59,7 +60,8 @@ class DTOGenerator(
                 return spec.superinterfaces.all { supersHaveOnlyNullableProps(it.key.asTypeSpec()) }
             }
         }
-        val superinterfaces = if (impl.ownSettings.propsForceNull)
+
+        var superinterfaces = if (impl.ownSettings.propsForceNull)
             kmClassSpec.superinterfaces.keys.filter { typeName ->
                 supersHaveOnlyNullableProps(typeName.asTypeSpec())
             }.toMutableList()
@@ -67,16 +69,16 @@ class DTOGenerator(
             kmClassSpec.superinterfaces.keys.toMutableList()
 
         // Force Cloneable
-        if(superinterfaces.none { it == Cloneable::class.asTypeName() }) {
+        if (superinterfaces.none { it == Cloneable::class.asTypeName() }) {
             superinterfaces.add(Cloneable::class.asTypeName())
         }
 
         // Force Comparable
-        if(superinterfaces.none { it == Comparable::class.asTypeName() }) {
+        if (superinterfaces.none { it == Comparable::class.asTypeName() }) {
             superinterfaces.add(Comparable::class.asTypeName().parameterizedBy(impl.implClassName))
         }
 
-        superinterfaces.forEach {
+        superinterfaces = superinterfaces.map {
             val type = if (it is ParameterizedTypeName) {
                 if (it.typeArguments.contains(impl.modelClassName)) {
                     ClassName(it.rawType.packageName, it.rawType.simpleName).parameterizedBy(
@@ -90,8 +92,8 @@ class DTOGenerator(
             } else {
                 it
             }
-            typeBuilder.addSuperinterface(type)
-        }
+            type
+        }.toMutableList()
 
         /**
          * Gather properties and create constructor
@@ -99,12 +101,26 @@ class DTOGenerator(
         val constructorBuilder = FunSpec.constructorBuilder()
 
         var propertyNum = 0
-        for ((name, propertyData) in gatherProperties(element)) {
-            if (propertyData.preventOverride)
+
+        val gatheredProperties = gatherProperties(element, className)
+
+        val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
+
+        if(skippedProperties.isNotEmpty()) {
+            superinterfaces = correctInheritanceChainFor(skippedProperties, superinterfaces)
+        }
+
+        superinterfaces.forEach {
+            typeBuilder.addSuperinterface(it)
+        }
+
+        for ((_, propertyData) in gatheredProperties) {
+            if (propertyData.preventOverride) {
                 continue
+            }
+            val name = propertyData.propertySpec.name
 
             val defaultInit = propertyData.defaultInit
-            val property = propertyData.typeSpec
 
             val type = if (impl.ownSettings.propsForceNull)
                 determinePropertyType(element, propertyData).copy(nullable = true)
@@ -131,6 +147,15 @@ class DTOGenerator(
                     type,
                     propertyData)
 
+            val defaultValueLiteral = if (defaultValue.contains("\""))
+                "%S"
+            else
+                "%L"
+
+            val defaultValueValue = if (defaultValue.contains("\""))
+                defaultValue.replace("\"", "").replace("\\", "")
+            else
+                defaultValue
 
 
             addAnnotations(propertyData, kotlinProperty, impl)
@@ -150,13 +175,13 @@ class DTOGenerator(
                             name,
                             type
                     )
-                            .defaultValue(defaultValue)
+                            .defaultValue(defaultValueLiteral, defaultValueValue)
                             .build()
             )
 
             typeBuilder.addProperty(
                     kotlinProperty
-                            .initializer(defaultValue)
+                            .initializer(defaultValueLiteral, defaultValueValue)
                             .build()
             )
             propertyNum++

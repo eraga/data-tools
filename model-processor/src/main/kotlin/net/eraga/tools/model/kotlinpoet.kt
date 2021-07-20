@@ -8,11 +8,17 @@ import com.squareup.kotlinpoet.metadata.specs.classFor
 import com.squareup.kotlinpoet.metadata.specs.internal.ClassInspectorUtil
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import kotlinx.metadata.KmProperty
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
-import net.eraga.tools.model.typescript.ClassNameSpec
+import javax.lang.model.element.AnnotationMirror
+import javax.lang.model.element.AnnotationValue
 import javax.lang.model.element.TypeElement
+import javax.lang.model.element.VariableElement
 import javax.lang.model.type.TypeMirror
+import javax.lang.model.util.SimpleAnnotationValueVisitor7
 import kotlin.reflect.KClass
+import kotlin.reflect.full.createInstance
+import kotlin.reflect.full.memberProperties
 
 /**
  * **kotplinpoet**
@@ -27,6 +33,226 @@ import kotlin.reflect.KClass
  *  Date: 13/07/2021
  *  Time: 19:25
  */
+
+
+/**
+ * Annotation value visitor adding members to the given builder instance.
+ */
+private class AnnotationSpecVisitor(
+        val builder: CodeBlock.Builder
+) : SimpleAnnotationValueVisitor7<CodeBlock.Builder, String>(builder) {
+
+    override fun defaultAction(o: Any, name: String) =
+            builder.add(memberForValue(o))
+
+    override fun visitAnnotation(a: AnnotationMirror, name: String) =
+            builder.add("%L", AnnotationSpec.get(a))
+
+    override fun visitEnumConstant(c: VariableElement, name: String) =
+            builder.add("%T.%L", c.asType(), c.simpleName)
+
+    override fun visitType(t: TypeMirror, name: String) =
+            builder.add("%T::class", t)
+
+    override fun visitArray(values: List<AnnotationValue>, name: String): CodeBlock.Builder {
+        builder.add("[⇥⇥")
+        values.forEachIndexed { index, value ->
+            if (index > 0) builder.add(", ")
+            value.accept(this, name)
+        }
+        builder.add("⇤⇤]")
+        return builder
+    }
+
+    fun memberForValue(value: Any) = when (value) {
+        is Class<*> -> CodeBlock.of("%T::class", value)
+        is Enum<*> -> CodeBlock.of("%T.%L", value.javaClass, value.name)
+        is String -> CodeBlock.of("%S", value)
+        is Float -> CodeBlock.of("%Lf", value)
+        is Char -> CodeBlock.of("'%L'", characterLiteralWithoutSingleQuotes(value))
+        else -> CodeBlock.of("%L", value)
+    }
+
+    fun characterLiteralWithoutSingleQuotes(c: Char): String = when {
+        c == '\b' -> "\\b" // \u0008: backspace (BS)
+        c == '\t' -> "\\t" // \u0009: horizontal tab (HT)
+        c == '\n' -> "\\n" // \u000a: linefeed (LF)
+        c == '\r' -> "\\r" // \u000d: carriage return (CR)
+        c == '\"' -> "\"" // \u0022: double quote (")
+        c == '\'' -> "\\'" // \u0027: single quote (')
+        c == '\\' -> "\\\\" // \u005c: backslash (\)
+        c.isIsoControl -> String.format("\\u%04x", c.code)
+        else -> c.toString()
+    }
+
+    val Char.isIsoControl: Boolean
+        get() {
+            return this in '\u0000'..'\u001F' || this in '\u007F'..'\u009F'
+        }
+}
+
+@KotlinPoetMetadataPreview
+fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
+    val className = ClassName.bestGuess(annotationType.toString())
+
+    val kclass = Class.forName(className.reflectionName()).kotlin
+    val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
+
+    val instance = if (nonOptionalArgs == 0)
+        kclass.createInstance()
+    else
+        null
+
+    val result = mutableListOf<AnnotationSpec>()
+
+    /**
+     * Extract repeatable annotations from containers
+     */
+    if (kclass.memberProperties.size == 1 &&
+            nonOptionalArgs == 1) {
+        val type = kclass.memberProperties.first().returnType.asTypeName()
+        if (type is ParameterizedTypeName &&
+                type.typeArguments.size == 1 &&
+                type.typeArguments.first() is WildcardTypeName) {
+            val typeName = (type.typeArguments.first() as WildcardTypeName).outTypes.first()
+            val spec = typeName.asTypeSpec()
+            if (spec.isAnnotation && spec.annotationSpecs.any { it.typeName.toString() == "kotlin.`annotation`.Repeatable" }) {
+                val executableElement = elementValues.keys.first { it.simpleName.toString() == "value" }
+                val value = elementValues[executableElement]!!.value
+                if (value is List<*>) {
+                    value.forEach {
+                        if (it is AnnotationMirror)
+                            result.addAll(it.asAnnotationSpec())
+                    }
+                }
+                return result
+            }
+        }
+    }
+
+    val builder = AnnotationSpec.builder(className).tag(this)
+    kclass.memberProperties.forEach {
+        val member = CodeBlock.builder()
+        val name = it.name
+        val key = this.elementValues.keys.firstOrNull { element -> element.simpleName.toString() == it.name }
+        if (key != null) {
+            member.add("%L = ", name)
+            val visitor = AnnotationSpecVisitor(member)
+            val value = elementValues[key]!!
+            value.accept(visitor, name)
+        } else {
+            // Try to fill annotation with default values if there was no-arg constructor
+//            val visitor = KmProperty()
+//            kmClass.properties.first { prop->prop.name == it.name }.accept(visitor)
+            if (instance != null) {
+                member.add("%L = ", name)
+                member.add("%L", it.getter.call(instance))
+            }
+        }
+        builder.addMember(member.build())
+    }
+
+    return result.apply { add(builder.build()) }
+}
+
+fun List<AnnotationSpec>.of(kclass: KClass<out Annotation>): List<AnnotationMirror> {
+    return filter {
+        it.typeName == kclass.asTypeName()
+    }.map { it.tags.values.first() as AnnotationMirror }
+}
+
+/**
+ * Has one or more of such annotations
+ */
+fun List<AnnotationSpec>.has(
+        kclass: KClass<out Annotation>
+): Boolean {
+    return of(kclass).isNotEmpty()
+}
+
+
+fun List<AnnotationSpec>.getValueOrNull(
+        kclass: KClass<out Annotation>, name: String = "value"): Any? {
+    val annotation = of(kclass).singleOrNull() ?: return null
+    val key = annotation.elementValues.keys
+            .firstOrNull { it.simpleName.toString() == name } ?: return null
+
+    return annotation.elementValues[key]!!.value
+}
+
+fun List<AnnotationSpec>.hasValueOf(
+        kclass: KClass<out Annotation>,
+        value: Any,
+        name: String = "value"): Boolean {
+    if (isEmpty())
+        return false
+
+//    val defaultGetter = kclass.memberProperties.firstOrNull { it.name == name }?.getter
+//            ?: throw IllegalArgumentException("$kclass has no argument with name '$name'")
+
+    /**
+     * Check if we have any annotations with this value
+     */
+    val first = of(kclass).firstOrNull { annotation ->
+        val key = annotation.elementValues.keys
+                .firstOrNull { it.simpleName.toString() == name }
+        if (key != null)
+            annotation.elementValues[key]!!.value == value
+        else
+            false
+    }
+    if (first != null)
+        return true
+
+//    /**
+//     * Didn't find value, lets get default value by reflection
+//     * and compare it with any instance which has default value
+//     */
+//    if (has(kclass)) {
+//        val defaultInstance = kclass.createInstance()
+//        val defaultValue = defaultGetter.call(defaultInstance)
+//
+//        return defaultValue == value
+//    }
+//
+//    /**
+//     * Didn't find instance, check if we have Repeatable
+//     */
+//    val regex = "@java.lang.annotation.Repeatable\\(value=interface (net.eraga.*)\\)".toRegex()
+//
+//    val groupKClass = kclass.annotations.filter {
+//        regex.matches(it.toString())
+//    }.map {
+//        regex.find(it.toString())!!.groupValues[1]
+//    }.map {
+//        Class.forName(it).kotlin
+//    }.singleOrNull() ?: return false
+//
+//    groupKClass as KClass<out Annotation>
+//
+//
+//    if (has(groupKClass)) {
+//        val list = getValueOrNull(groupKClass) as List<AnnotationMirror>?
+//        list?.forEach { annotation ->
+//            val key = annotation.elementValues.keys
+//                    .firstOrNull { it.simpleName.toString() == name }
+//
+//            if (key != null && annotation.elementValues[key]!!.value == value)
+//                return true
+//        }
+//        // Didn't find value, so we have to get default value by reflection
+////        val defaultInstance = groupKClass.createInstance()
+////        val defaultValue = groupKClass.memberProperties
+////                .firstOrNull { it.name == name }
+////                ?.getter
+////                ?.call(defaultInstance) ?: return false
+////
+////        return defaultValue == value
+//    }
+
+    return false
+}
+
 
 @OptIn(DelicateKotlinPoetApi::class)
 @KotlinPoetMetadataPreview
@@ -65,8 +291,9 @@ fun TypeName.asClassName(): ClassName {
 }
 
 fun ClassName.isArray(): Boolean {
+    // TODO: fix it
     if (canonicalName.contains("Array")) {
-        println(canonicalName)
+//        println(canonicalName)
         return true
     }
     return false
@@ -126,7 +353,7 @@ fun ClassName.implements(name: String): Boolean {
 
     val elementsClassInspector = ProcessingContext.classInspector
 
-    if(ClassName.bestGuess(name).canonicalName == canonicalName)
+    if (ClassName.bestGuess(name).canonicalName == canonicalName)
         return true
 
     val km = when (val className = bestGuessParametrized()) {

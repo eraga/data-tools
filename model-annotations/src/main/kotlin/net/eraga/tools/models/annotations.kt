@@ -9,7 +9,7 @@ import kotlin.reflect.KClass
  */
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.PROPERTY)
-annotation class PreventOverride()
+annotation class PreventOverride
 
 
 @Retention(AnnotationRetention.SOURCE)

@@ -1,6 +1,7 @@
 package net.eraga.tools.models
 
 import net.eraga.tools.models.implement.*
+import java.lang.annotation.ElementType
 
 /**
  * **Implement**
@@ -88,4 +89,21 @@ annotation class Implement {
             val kind: Kind = Kind.FINAL_CLASS,
             val implementAnnotations: String = ""
     )
+
+
+    /**
+     * Don't implement property for [Implement] implementation
+     *
+     * @param in simple name of [Implement] Class for which to omit implementation,
+     * empty value makes it to be omitted for all implementations
+     */
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(Omitted::class)
+    @Target(AnnotationTarget.PROPERTY, AnnotationTarget.PROPERTY_GETTER)
+    @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
+    annotation class Omit(val `in`: String = "*")
+
+    annotation class Omitted(vararg val value: Omit)
 }
