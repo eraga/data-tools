@@ -109,16 +109,27 @@ annotation class Implement {
 
 
     /**
+     * Provides default value initializer of property in default constructor
      *
+     * @param with initializer string, will be written as is, required parameter.
+     * @param in which implementation, defaults to empty which matches all implementations
      */
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(Initialized::class)
     @Target(AnnotationTarget.PROPERTY)
     @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
     annotation class Init(
             val with: String,
-            vararg val scopes: InitScope = []
+            val `in`: String = ""
+//            TODO:
+//            vararg val scopes: InitScope = []
     )
 
-    enum class InitScope {
-        PROPERTY, PRIMARY_CONSTRUCTOR, SECONDARY_CONSTRUCTOR
-    }
+    annotation class Initialized(vararg val value: Init)
+
+//    enum class InitScope {
+//        PROPERTY, PRIMARY_CONSTRUCTOR, SECONDARY_CONSTRUCTOR
+//    }
 }

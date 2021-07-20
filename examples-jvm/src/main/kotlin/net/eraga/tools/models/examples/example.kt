@@ -44,10 +44,10 @@ interface WithStringId : WithAnyId {
 }
 
 interface WithUUId : WithAnyId {
-    @ConstructorInitializer(value = "UUID.randomUUID()")
+    @Implement.Init("UUID.randomUUID()")
     override val id: UUID
 
-    @ConstructorInitializer(value = "LocalDateTime.now()")
+    @Implement.Init("LocalDateTime.now()")
     val asd: LocalDateTime
 }
 

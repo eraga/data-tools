@@ -35,7 +35,7 @@ interface UserModel : WithLongId, WithCreatedUpdatedDateTime, WithEnabled {
 @Entity
 @Table(name = "users")
 data class User(
-        @ConstructorInitializer("\"nowByUTC()\"")
+        @Implement.Init("\"nowByUTC()\"")
         override var email: String,
 
         @Implement.Omit("UserDTO")
@@ -45,14 +45,14 @@ data class User(
         @Enumerated(EnumType.STRING)
         override var role: UserRole = UserRole.ROLE_USER
 ) : UserModel {
-    @ConstructorInitializer("42")
+    @Implement.Init("42")
     override var id: Long = 0
 
-    @ConstructorInitializer("LocalDateTime.now()")
+    @Implement.Init("LocalDateTime.now()")
     @Column(nullable = false)
     override var created: LocalDateTime = LocalDateTime.now()
 
-    @ConstructorInitializer("LocalDateTime.now()")
+    @Implement.Init("LocalDateTime.now()")
     @Column(nullable = false)
     override var updated: LocalDateTime = LocalDateTime.now()
 

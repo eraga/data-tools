@@ -19,6 +19,7 @@ import javax.lang.model.util.SimpleAnnotationValueVisitor7
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.memberProperties
+import kotlin.reflect.full.primaryConstructor
 
 /**
  * **kotplinpoet**
@@ -95,6 +96,19 @@ class AnnotationSpecMap(
         val map: Map<String, Any>
 )
 
+fun AnnotationSpec.valueOf(name: String): Any? {
+    return tag(AnnotationSpecMap::class)?.map?.get(name)
+}
+
+fun List<AnnotationSpec>.allHaving(name: String, value: Any): List<AnnotationSpec> {
+    return filter { it.valueOf(name) == value}
+}
+
+fun List<AnnotationSpec>.singleHaving(name: String, value: Any): AnnotationSpec? {
+    return singleOrNull { it.valueOf(name) == value }
+}
+
+
 @KotlinPoetMetadataPreview
 fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val className = ClassName.bestGuess(annotationType.toString())
@@ -102,10 +116,21 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val kclass = Class.forName(className.reflectionName()).kotlin
     val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
 
+
     val instance = if (nonOptionalArgs == 0)
         kclass.createInstance()
-    else
-        null
+    else if (nonOptionalArgs == 1 &&
+            kclass.memberProperties.first().returnType.classifier == String::class) {
+        val initMap = kclass.constructors
+                .first().parameters
+                .filter { !it.isOptional }
+                .associateBy( { it }, {
+                    (it.type.classifier as KClass<*>).createInstance()
+                }
+        )
+
+        kclass.constructors.first().callBy(initMap)
+    } else null
 
     val result = mutableListOf<AnnotationSpec>()
     /**

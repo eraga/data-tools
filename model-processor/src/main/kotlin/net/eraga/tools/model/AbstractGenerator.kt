@@ -82,25 +82,24 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             val annotations = propertySpec.annotations //+ (propertySpec.getter?.annotations ?: emptySet())
 
             val propName = propertySpec.name
-            val defaultInit = annotations.getValueOrNull(ConstructorInitializer::class, "value") as String?
+//            val defaultInit = annotations.getValueOrNull(Implement.Init::class, "with") as String?
+
+            val implementInits = annotations.of(Implement.Init::class)
+            val defaultInit = implementInits.singleHaving("in", implClassName.simpleName)?.valueOf("with") as String?
+                    ?: implementInits.singleHaving("in", "")?.valueOf("with") as String?
 
             val skip = annotations.hasValueOf(Implement.Omit::class, "", "in") ||
                     annotations.hasValueOf(Implement.Omit::class, implClassName.simpleName, "in")
 
-            if (implClassName.simpleName.contains("ImmutablePerson") &&
-                    propName == "id" &&
-                    level == 0) {
-                println("At element: ${element.simpleName}:")
-                annotations.hasValueOf(Implement.Omit::class, "", "in")
-                println("   $implClassName:$propName !!!!PASS!!!!: $skip")
-                println("   prop: ${annotations.map { it.typeName }}")
-                println("   gett: ${propertySpec.getter?.annotations?.map { it.typeName }}")
-//                val regex = "@java.lang.annotation.Repeatable\\(value=interface (.*)\\)".toRegex()
-//                val filtered = Implement.Omit::class.annotations.filter {
-//                    regex.matches(it.toString())
-//                }.map { regex.find(it.toString())!!.groupValues[1].replace("$", ".") }
-//                println("   ${filtered}")
-            }
+//            if (implClassName.simpleName.contains("ImmutablePerson") &&
+//                    propName == "id" &&
+//                    level == 0) {
+//                println("At element: ${element.simpleName}:")
+//                annotations.hasValueOf(Implement.Omit::class, "", "in")
+//                println("   $implClassName:$propName !!!!PASS!!!!: $skip")
+//                println("   prop: ${annotations.map { it.typeName }}")
+//                println("   gett: ${propertySpec.getter?.annotations?.map { it.typeName }}")
+//            }
 
             getters[propName] = PropertyData(
                     defaultInit,
