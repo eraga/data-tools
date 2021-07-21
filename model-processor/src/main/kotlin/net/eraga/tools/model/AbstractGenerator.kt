@@ -31,6 +31,11 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             "java.lang.Override"
     )
 
+    val SUPPRESS_SKIP_ME = AnnotationSpec
+            .builder(ClassName.bestGuess("kotlin.Suppress"))
+            .addMember("\"UNUSED_PARAMETER\"")
+            .build()
+
 
     protected val fileSpecs: MutableList<FileSpec> = mutableListOf()
 
@@ -97,17 +102,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             val implementAnnotate = annotations.of(Implement.Annotate::class).allHaving("in", simpleName)
 
             @Suppress("UNCHECKED_CAST")
-            val additionalAnnotations = implementAnnotate.map {
-                val type = it.valueOf("with") as DeclaredType
-                val args = it.valueOf("args") as List<AnnotationValue>?
-
-                val annotationClass = ClassName.bestGuess(type.toString())
-
-                val builder = AnnotationSpec.builder(annotationClass)
-                args?.forEach { arg ->
-                    builder.addMember(arg.value as String)
-                }
-                builder.build()
+            val additionalAnnotations = implementAnnotate.map { annotationSpec ->
+                annotationBuilderFromAnnotate(annotationSpec).build()
             }
 
 //            if(additionalAnnotations.isNotEmpty()) {
@@ -562,6 +558,36 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addFunction(compareToFun.build())
     }
 
+    fun annotationBuilderFromAnnotate(annotationSpec : AnnotationSpec): AnnotationSpec.Builder {
+        val type = annotationSpec.valueOf("with") as DeclaredType
+        val args = annotationSpec.valueOf("args") as List<AnnotationValue>?
+
+        val annotationClass = ClassName.bestGuess(type.toString())
+
+        val builder = AnnotationSpec.builder(annotationClass)
+        args?.forEach { arg ->
+            builder.addMember(arg.value as String)
+        }
+        return builder
+    }
+
+    fun implementAnnotates(
+            typeBuilder: TypeSpec.Builder,
+            kmClassSpec: TypeSpec,
+            simpleName: String
+    ) {
+
+        val implementAnnotate = kmClassSpec.annotationSpecs
+                .of(Implement.Annotate::class)
+                .allHaving("in", simpleName)
+
+        @Suppress("UNCHECKED_CAST")
+        implementAnnotate.forEach { annotationSpec ->
+            typeBuilder.addAnnotation(
+                    annotationBuilderFromAnnotate(annotationSpec).build()
+            )
+        }
+    }
 
     fun addAnnotations(propertyData: PropertyData, kotlinProperty: PropertySpec.Builder, impl: AbstractSettings<*>) {
         propertyData.propertySpec.annotations

@@ -1,13 +1,12 @@
 package net.eraga.tools.models
 
 import net.eraga.tools.models.implement.*
-import java.lang.annotation.ElementType
 import kotlin.reflect.KClass
 
 /**
  * **Implement**
  *
- * TODO: Implement description
+ * Grouping Annotation for implementation definition annotations.
  *
  * @author
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
@@ -138,6 +137,10 @@ annotation class Implement {
      * When certain implementation property requires to be annotated with one that
      * can't be used on model interface property or not desired in all implementations this
      *
+     * @param in implementation class simple name of which implementation to annotate
+     * @param with annotation class
+     * @param args array of named arguments and values to be passed to e.g.
+     * `["argument1 = value1", "argument2 = Value(2)"]`
      */
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")

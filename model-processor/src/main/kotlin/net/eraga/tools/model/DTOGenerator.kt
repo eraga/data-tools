@@ -166,6 +166,7 @@ class DTOGenerator(
                                 "skipMe",
                                 ProcessingContext.ignoreItClassName
                         )
+                                .addAnnotation(SUPPRESS_SKIP_ME)
                                 .addModifiers(KModifier.VARARG)
                                 .build()
                 )

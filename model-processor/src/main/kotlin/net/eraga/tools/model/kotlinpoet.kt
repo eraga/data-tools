@@ -101,7 +101,7 @@ fun AnnotationSpec.valueOf(name: String): Any? {
 }
 
 fun List<AnnotationSpec>.allHaving(name: String, value: Any): List<AnnotationSpec> {
-    return filter { it.valueOf(name) == value}
+    return filter { it.valueOf(name) == value }
 }
 
 fun List<AnnotationSpec>.singleHaving(name: String, value: Any): AnnotationSpec? {
@@ -116,21 +116,27 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val kclass = Class.forName(className.reflectionName()).kotlin
     val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
 
+    val instance = try {
+        if(kclass == Metadata::class)
+            null
+        else if (nonOptionalArgs == 0 && kclass.constructors.any { it.parameters.all { p -> p.isOptional } })
+            kclass.createInstance()
+        else if (nonOptionalArgs == 1 &&
+                kclass.memberProperties.first().returnType.classifier == String::class) {
+            val initMap = kclass.constructors
+                    .first().parameters
+                    .filter { !it.isOptional }
+                    .associateBy({ it }, {
+                        (it.type.classifier as KClass<*>).createInstance()
+                    }
+                    )
 
-    val instance = if (nonOptionalArgs == 0)
-        kclass.createInstance()
-    else if (nonOptionalArgs == 1 &&
-            kclass.memberProperties.first().returnType.classifier == String::class) {
-        val initMap = kclass.constructors
-                .first().parameters
-                .filter { !it.isOptional }
-                .associateBy( { it }, {
-                    (it.type.classifier as KClass<*>).createInstance()
-                }
-        )
-
-        kclass.constructors.first().callBy(initMap)
-    } else null
+            kclass.constructors.first().callBy(initMap)
+        } else null
+    } catch (e: NoSuchMethodException) {
+        println("ERROR: NoSuchMethodException for ${e.message} while processing annotation $kclass")
+        null
+    }
 
     val result = mutableListOf<AnnotationSpec>()
     /**

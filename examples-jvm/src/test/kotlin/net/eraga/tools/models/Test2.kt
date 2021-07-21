@@ -1,5 +1,6 @@
 package net.eraga.tools.models
 
+import net.eraga.tools.models.Implement.*
 import java.io.Serializable
 import javax.persistence.Column
 import javax.persistence.Entity
@@ -37,11 +38,11 @@ interface WithSecondName {
 
 interface WithIdAndName : WithIntID, WithName
 
-@Implement.Immutable("")
-@Implement.Immutable("", implementAnnotations = "javax.persistence.*")
-@Implement.DTO
-@Implement.DTO(suffix = "Update", propsForceNull = true)
-@Implement.Annotate("Person", Entity::class)
+@Immutable("")
+@DTO
+@DTO(suffix = "Update", propsForceNull = true)
+@Annotate("Person", Entity::class)
+//@GeneratedClass("")
 interface PersonModel :
         WithIdAndName,
         WithSecondName,
@@ -50,35 +51,34 @@ interface PersonModel :
         Cloneable,
         Serializable {
 
-    @get:Id
-    @Implement.Init("0")
-    @Implement.Init("24", "PersonDTO")
-    @Implement.Omit("PersonUpdateDTO")
-    @Implement.Annotate("Person", Id::class)
-    @Implement.Annotate("Person", Column::class, "nullable = false", "unique = true")
+    @Init("0")
+    @Init("24", "PersonDTO")
+    @Omit("PersonUpdateDTO")
+    @Annotate("Person", Id::class)
+    @Annotate("Person", Column::class, "nullable = false", "unique = true")
     override var id: Int
 
-    @Implement.Omit("PersonDTO")
+    @Omit("PersonDTO")
     override val name: String
 
-    @Implement.Omit("PersonDTO")
+    @Omit("PersonDTO")
     val nameOfPerson: String
 
     val arrayOfPerson: Array<Int>
 
-    @Implement.DTO
+    @DTO
     private class UpdateIdNameRequest() : WithIdAndName {
-        @Implement.Omit
-        @Implement.Init("42")
+        @Omit
+        @Init("42")
         override val id: Int = 0
 
-        @Implement.Init("\"42\"")
+        @Init("\"42\"")
         override val name: String = ""
     }
 }
 
 
-@Implement.JPAEntity
+@JPAEntity
 interface PersonJPAModel : PersonModel {
     override var id: Int
     override val name: String

@@ -133,7 +133,7 @@ class ForkedElementsClassInspector private constructor(
     private fun VariableElement.annotationSpecs(): List<AnnotationSpec> {
         @Suppress("DEPRECATION")
         return filterOutNullabilityAnnotations(
-                annotationMirrors.map { AnnotationSpec.get(it) }
+                annotationMirrors.map { it.asAnnotationSpec() }.flatten()
         )
     }
 
@@ -151,9 +151,7 @@ class ForkedElementsClassInspector private constructor(
     private fun ExecutableElement.annotationSpecs(): List<AnnotationSpec> {
         @Suppress("DEPRECATION")
         return filterOutNullabilityAnnotations(
-                annotationMirrors.map {
-                        it.asAnnotationSpec()
-                }.flatten()
+                annotationMirrors.map { it.asAnnotationSpec() }.flatten()
         )
     }
 
@@ -508,10 +506,14 @@ class ForkedElementsClassInspector private constructor(
                 return ClassData(
                         declarationContainer = declarationContainer,
                         className = className,
-                        annotations = if (declarationContainer.hasAnnotations) {
+                        annotations = if (
+                                declarationContainer.hasAnnotations ||
+                                // There is bug in kotlin with repeatable annotations:
+                                // hasAnnotations is false when all annotations are repeatable
+                                typeElement.annotationMirrors.size > 0) {
                             ClassInspectorUtil.createAnnotations {
                                 @Suppress("DEPRECATION")
-                                addAll(typeElement.annotationMirrors.map { AnnotationSpec.get(it) })
+                                addAll(typeElement.annotationMirrors.map { it.asAnnotationSpec() }.flatten())
                             }
                         } else {
                             emptyList()
@@ -535,9 +537,8 @@ class ForkedElementsClassInspector private constructor(
                                     }
                                     jvmName = nameValue.value as String
                                 }
-                                @Suppress("DEPRECATION")
-                                AnnotationSpec.get(it)
-                            }
+                                it.asAnnotationSpec()
+                            }.flatten()
                     )
                 }
                 return FileData(

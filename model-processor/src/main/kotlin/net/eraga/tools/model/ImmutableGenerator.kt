@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
+import net.eraga.tools.models.Implement
 
 /**
  * **DTOGenerator**
@@ -71,6 +72,7 @@ class ImmutableGenerator(
          * Class annotations
          */
         kmClassSpec.annotationSpecs
+                .filterNot { it.typeName != Implement.Annotate::class.asTypeName() }
                 .filter {
                     impl.implementAnnotations.toRegex().matches(it.typeName.toString())
                 }
@@ -78,6 +80,8 @@ class ImmutableGenerator(
                     if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
                         typeBuilder.addAnnotation(it)
                 }
+
+        implementAnnotates(typeBuilder, kmClassSpec, impl.implClassName.simpleName)
 
 
         for ((_, propertyData) in gatheredProperties) {
@@ -131,6 +135,7 @@ class ImmutableGenerator(
                                 "skipMe",
                                 ProcessingContext.ignoreItClassName
                         )
+                                .addAnnotation(SUPPRESS_SKIP_ME)
                                 .addModifiers(KModifier.VARARG)
                                 .build()
                 )
