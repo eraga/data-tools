@@ -39,6 +39,7 @@ interface WithSecondName {
 interface WithIdAndName : WithIntID, WithName
 
 @Immutable("")
+@Immutable
 @DTO
 @DTO(suffix = "Update", propsForceNull = true)
 @Annotate("Person", Entity::class)
@@ -67,13 +68,16 @@ interface PersonModel :
     val arrayOfPerson: Array<Int>
 
     @DTO
-    private class UpdateIdNameRequest() : WithIdAndName {
+    interface UpdateIdNameRequest : WithIdAndName {
         @Omit
         @Init("42")
-        override val id: Int = 0
+        override val id: Int
 
         @Init("\"42\"")
-        override val name: String = ""
+        override val name: String
+
+        @Init("\"124\"")
+        val propNotKnownToImmutable: Any
     }
 }
 

@@ -208,7 +208,7 @@ class ImmutableGenerator(
             implementCopiable(typeBuilder, impl.implClassName)
 
         for (dtoImpl in ProcessingContext.listElementDTOs(impl.modelClassName)) {
-            funUpdateByBuilder(dtoImpl, typeBuilder)
+            funUpdateByBuilder(dtoImpl, typeBuilder, impl.implClassName)
         }
 
         fileBuilder.addType(typeBuilder.build())
@@ -221,15 +221,22 @@ class ImmutableGenerator(
      */
     private fun funUpdateByBuilder(
             settings: AbstractSettings<*>,
-            typeBuilder: TypeSpec.Builder
+            typeBuilder: TypeSpec.Builder,
+            returns: ClassName
     ) {
         val propertySpecs = settings.typeSpec.propertySpecs
         val param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
         val extToBuilder = FunSpec.builder("updateBy")
                 .addParameter(param, settings.implClassName)
+                .returns(returns)
+
+        val parentPropNames = typeBuilder.propertySpecs.map { it.name }
 
         val funBodyBuilder = CodeBlock.builder()
         for (prop in propertySpecs) {
+            if(prop.name !in parentPropNames)
+                continue
+
             if (prop.type.isNullable &&
                     !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable) {
                 funBodyBuilder.beginControlFlow("if($param.${prop.name} != null)")
@@ -238,6 +245,7 @@ class ImmutableGenerator(
             } else
                 funBodyBuilder.add("this.${prop.name} = $param.${prop.name}\n")
         }
+        funBodyBuilder.add("return this")
 
         extToBuilder.addCode(funBodyBuilder.build())
         typeBuilder.addFunction(extToBuilder.build())

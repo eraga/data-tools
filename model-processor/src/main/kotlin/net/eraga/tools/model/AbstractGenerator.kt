@@ -375,12 +375,15 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
     fun funModelExtensionToBuilder(
             settings: AbstractSettings<*>,
-            propertySpecs: List<PropertySpec>
+            dtoPropertySpecs: List<PropertySpec>
     ): FunSpec.Builder {
         val extToBuilder = FunSpec.builder("to${settings.implClassName.simpleName}")
                 .receiver(settings.modelClassName)
                 .returns(settings.implClassName)
         val funBodyBuilder = CodeBlock.builder()
+
+        val modelPropNames = settings.modelClassName.asTypeSpec().propertySpecs.map { it.name }
+        val propertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
 
         if (propertySpecs.isNotEmpty()) {
             val props = propertySpecs.joinToString { "${it.name} = this.${it.name}" }
@@ -576,7 +579,6 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             kmClassSpec: TypeSpec,
             simpleName: String
     ) {
-
         val implementAnnotate = kmClassSpec.annotationSpecs
                 .of(Implement.Annotate::class)
                 .allHaving("in", simpleName)
