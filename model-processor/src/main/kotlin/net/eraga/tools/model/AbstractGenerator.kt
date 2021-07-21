@@ -561,8 +561,9 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 .addFunction(compareToFun.build())
     }
 
-    fun annotationBuilderFromAnnotate(annotationSpec : AnnotationSpec): AnnotationSpec.Builder {
+    private fun annotationBuilderFromAnnotate(annotationSpec : AnnotationSpec): AnnotationSpec.Builder {
         val type = annotationSpec.valueOf("with") as DeclaredType
+        @Suppress("UNCHECKED_CAST")
         val args = annotationSpec.valueOf("args") as List<AnnotationValue>?
 
         val annotationClass = ClassName.bestGuess(type.toString())
