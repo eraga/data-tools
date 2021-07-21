@@ -8,10 +8,8 @@ import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.*
 import java.util.*
-import javax.lang.model.element.AnnotationMirror
-import javax.lang.model.element.Element
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.TypeElement
+import javax.lang.model.element.*
+import javax.lang.model.type.DeclaredType
 import kotlin.NoSuchElementException
 
 /**
@@ -64,10 +62,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         }
 
         val metadata = element.getAnnotation(Metadata::class.java)
-        if (metadata == null) {
-//            println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
-            return getters
-        }
+                ?: // println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
+                return getters
 
         val kmClass = metadata.toImmutableKmClass()
         val typeSpec = kmClass.toTypeSpec(
@@ -80,12 +76,43 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             val propName = propertySpec.name
 //            val defaultInit = annotations.getValueOrNull(Implement.Init::class, "with") as String?
 
+            val simpleName = implClassName.simpleName
+
+            /**
+             * Initializers
+             */
             val implementInits = annotations.of(Implement.Init::class)
-            val defaultInit = implementInits.singleHaving("in", implClassName.simpleName)?.valueOf("with") as String?
+            val defaultInit = implementInits.singleHaving("in", simpleName)?.valueOf("with") as String?
                     ?: implementInits.singleHaving("in", "")?.valueOf("with") as String?
 
+            /**
+             * Omitting prop implementation
+             */
             val skip = annotations.hasValueOf(Implement.Omit::class, "", "in") ||
-                    annotations.hasValueOf(Implement.Omit::class, implClassName.simpleName, "in")
+                    annotations.hasValueOf(Implement.Omit::class, simpleName, "in")
+
+            /**
+             * Annotations specific to implementation
+             */
+            val implementAnnotate = annotations.of(Implement.Annotate::class).allHaving("in", simpleName)
+
+            @Suppress("UNCHECKED_CAST")
+            val additionalAnnotations = implementAnnotate.map {
+                val type = it.valueOf("with") as DeclaredType
+                val args = it.valueOf("args") as List<AnnotationValue>?
+
+                val annotationClass = ClassName.bestGuess(type.toString())
+
+                val builder = AnnotationSpec.builder(annotationClass)
+                args?.forEach { arg ->
+                    builder.addMember(arg.value as String)
+                }
+                builder.build()
+            }
+
+//            if(additionalAnnotations.isNotEmpty()) {
+//                println(additionalAnnotations)
+//            }
 
 //            if (implClassName.simpleName.contains("ImmutablePerson") &&
 //                    propName == "id" &&
@@ -98,10 +125,11 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 //            }
 
             getters[propName] = PropertyData(
-                    defaultInit,
-                    skip,
-                    level > 0,
-                    typeSpec.propertySpecs.first { it.name == propName }
+                    defaultInit = defaultInit,
+                    preventOverride = skip,
+                    isInherited = level > 0,
+                    propertySpec = typeSpec.propertySpecs.first { it.name == propName },
+                    additionalAnnotations = additionalAnnotations
             )
         }
         return getters
@@ -381,8 +409,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
             funBodyBuilder.add(propertySpecs.joinToString(", \" + \n") {
                 val isString = it.type == String::class.asTypeName()
-                val sq = if(isString) "\\\"" else ""
-                val toStr = if(isString) "" else ".toString()"
+                val sq = if (isString) "\\\"" else ""
+                val toStr = if (isString) "" else ".toString()"
                 "\"${it.name} = $sq\${${it.name}$toStr}$sq"
             })
 
@@ -544,6 +572,10 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                     if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
                         kotlinProperty.addAnnotation(it)
                 }
+
+        propertyData.additionalAnnotations.forEach {
+            kotlinProperty.addAnnotation(it)
+        }
     }
 
     fun supersHaveThisProp(spec: TypeSpec, propertySpec: PropertySpec): Boolean {

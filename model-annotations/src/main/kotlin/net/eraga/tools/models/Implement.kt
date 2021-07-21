@@ -2,6 +2,7 @@ package net.eraga.tools.models
 
 import net.eraga.tools.models.implement.*
 import java.lang.annotation.ElementType
+import kotlin.reflect.KClass
 
 /**
  * **Implement**
@@ -132,4 +133,23 @@ annotation class Implement {
 //    enum class InitScope {
 //        PROPERTY, PRIMARY_CONSTRUCTOR, SECONDARY_CONSTRUCTOR
 //    }
+
+    /**
+     * When certain implementation property requires to be annotated with one that
+     * can't be used on model interface property or not desired in all implementations this
+     *
+     */
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(Annotations::class)
+    @Target(AnnotationTarget.PROPERTY, AnnotationTarget.CLASS)
+    @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
+    annotation class Annotate(
+            val `in`: String,
+            val with: KClass<out Annotation>,
+            vararg val args: String = []
+    )
+
+    annotation class Annotations(vararg val value: Annotate)
 }

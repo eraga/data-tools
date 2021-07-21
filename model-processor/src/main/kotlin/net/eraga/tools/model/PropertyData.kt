@@ -1,9 +1,8 @@
 package net.eraga.tools.model
 
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import javax.lang.model.element.ExecutableElement
 
 /**
  * **PropertyData**
@@ -23,5 +22,6 @@ class PropertyData(
     val defaultInit: String?,
     val preventOverride: Boolean,
     val isInherited: Boolean,
-    val propertySpec: PropertySpec
+    val propertySpec: PropertySpec,
+    val additionalAnnotations: List<AnnotationSpec>
 )

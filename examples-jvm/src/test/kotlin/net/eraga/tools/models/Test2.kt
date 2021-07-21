@@ -37,11 +37,11 @@ interface WithSecondName {
 
 interface WithIdAndName : WithIntID, WithName
 
-@Implement.Immutable
+@Implement.Immutable("")
 @Implement.Immutable("", implementAnnotations = "javax.persistence.*")
 @Implement.DTO
 @Implement.DTO(suffix = "Update", propsForceNull = true)
-@Entity
+@Implement.Annotate("Person", Entity::class)
 interface PersonModel :
         WithIdAndName,
         WithSecondName,
@@ -54,6 +54,8 @@ interface PersonModel :
     @Implement.Init("0")
     @Implement.Init("24", "PersonDTO")
     @Implement.Omit("PersonUpdateDTO")
+    @Implement.Annotate("Person", Id::class)
+    @Implement.Annotate("Person", Column::class, "nullable = false", "unique = true")
     override var id: Int
 
     @Implement.Omit("PersonDTO")
@@ -61,6 +63,8 @@ interface PersonModel :
 
     @Implement.Omit("PersonDTO")
     val nameOfPerson: String
+
+    val arrayOfPerson: Array<Int>
 
     @Implement.DTO
     private class UpdateIdNameRequest() : WithIdAndName {
@@ -90,6 +94,6 @@ fun main() {
     println("done")
 
     val person = Person()
-    val immutable = ImmutablePerson(person).clone()
+    val immutable = Person(person).clone()
     val immutablePerson = immutable.toPersonUpdateDTO()
 }
