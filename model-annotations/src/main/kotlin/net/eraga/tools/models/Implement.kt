@@ -155,4 +155,17 @@ annotation class Implement {
     )
 
     annotation class Annotations(vararg val value: Annotate)
+
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(Narrows::class)
+    @Target(AnnotationTarget.PROPERTY)
+    @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
+    annotation class Narrow(
+            val `in`: String,
+            val with: String
+    )
+
+    annotation class Narrows(vararg val value: Narrow)
 }

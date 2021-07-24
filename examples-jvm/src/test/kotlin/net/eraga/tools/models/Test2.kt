@@ -1,7 +1,10 @@
 package net.eraga.tools.models
 
+import net.eraga.commons.Copiable
 import net.eraga.tools.models.Implement.*
 import java.io.Serializable
+import java.time.LocalDateTime
+import java.util.*
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -45,12 +48,12 @@ interface WithIdAndName : WithIntID, WithName
 @Annotate("Person", Entity::class)
 //@GeneratedClass("")
 interface PersonModel :
-        WithIdAndName,
-        WithSecondName,
-
-        Comparable<PersonModel>,
-        Cloneable,
-        Serializable {
+    WithIdAndName,
+    WithSecondName,
+    Comparable<PersonModel>,
+    Cloneable,
+    Copiable,
+    Serializable {
 
     @Init("0")
     @Init("24", "PersonDTO")
@@ -90,8 +93,8 @@ interface PersonJPAModel : PersonModel {
 }
 
 data class Test2(
-        val a: String,
-        val b: String
+    val a: String,
+    val b: String
 )
 
 fun main() {

@@ -383,7 +383,8 @@ fun ImmutableKmClass.asTypeSpec(): TypeSpec {
 fun TypeElement.implements(kclass: KClass<*>): Boolean {
     val kmClass = this.toImmutableKmClass()
 
-    return kmClass.supertypes.any { it.classifier.classString() == kclass.qualifiedName }
+    return kmClass.supertypes.any { it.classifier.classString() == kclass.qualifiedName } ||
+            this.asClassName().implements(kclass.simpleName.toString())
 }
 
 @KotlinPoetMetadataPreview
