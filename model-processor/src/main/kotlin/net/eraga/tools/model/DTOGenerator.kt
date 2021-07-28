@@ -22,7 +22,7 @@ import net.eraga.tools.model.ProcessingContext.asTypeSpec
  */
 @KotlinPoetMetadataPreview
 class DTOGenerator(
-        listOfImplementations: List<DTOSettings>
+    listOfImplementations: List<DTOSettings>
 ) : AbstractGenerator<DTOSettings>(listOfImplementations) {
     override fun generate() {
         for (implementation in listOfImplementations) {
@@ -35,12 +35,13 @@ class DTOGenerator(
         println("           STARTING impl $className")
         val element = impl.modelElement
         val fileBuilder = FileSpec.builder(
-                className.packageName,
-                className.simpleName)
+            className.packageName,
+            className.simpleName
+        )
 
         val typeBuilder = TypeSpec
-                .classBuilder(className)
-                .addModifiers(impl.classModifier)
+            .classBuilder(className)
+            .addModifiers(impl.classModifier)
 
         val kmClass = element.getAnnotation(Metadata::class.java)!!.toImmutableKmClass()
         val kmClassSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
@@ -82,9 +83,9 @@ class DTOGenerator(
             val type = if (it is ParameterizedTypeName) {
                 if (it.typeArguments.contains(impl.modelClassName)) {
                     ClassName(it.rawType.packageName, it.rawType.simpleName).parameterizedBy(
-                            it.typeArguments.map { arg ->
-                                if (arg == impl.modelClassName) impl.implClassName else it
-                            }
+                        it.typeArguments.map { arg ->
+                            if (arg == impl.modelClassName) impl.implClassName else it
+                        }
                     )
                 } else {
                     it
@@ -106,7 +107,7 @@ class DTOGenerator(
 
         val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
 
-        if(skippedProperties.isNotEmpty()) {
+        if (skippedProperties.isNotEmpty()) {
             superinterfaces = correctInheritanceChainFor(skippedProperties, superinterfaces)
         }
 
@@ -122,30 +123,35 @@ class DTOGenerator(
 
             val defaultInit = propertyData.defaultInit
 
-            val type = if (impl.ownSettings.propsForceNull)
-                determinePropertyType(element, propertyData).copy(nullable = true)
-            else
-                determinePropertyType(element, propertyData)
+            val type = determinePropertyType(element, propertyData, this)
+                .let {
+                    if (impl.ownSettings.propsForceNull)
+                        it.copy(nullable = true)
+                    else
+                        it
+                }
 
 
             val kotlinProperty = PropertySpec.builder(name, type)
-                    .mutable(true)
-                    .setter(FunSpec.setterBuilder()
-                            .addModifiers(KModifier.PRIVATE)
-                            .build()
-                    )
+                .mutable(true)
+                .setter(
+                    FunSpec.setterBuilder()
+                        .addModifiers(KModifier.PRIVATE)
+                        .build()
+                )
 
 
 
             if (superinterfaces.any {
-                        supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
-                    })
+                    supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
+                })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
 
             val defaultValue = defaultInit ?: constructorDefaultInitializer(
-                    impl,
-                    type,
-                    propertyData)
+                impl,
+                type,
+                propertyData
+            )
 
             val defaultValueLiteral = if (defaultValue.contains("\""))
                 "%S"
@@ -162,28 +168,28 @@ class DTOGenerator(
 
             if (impl.constructorVarargPosition == propertyNum)
                 constructorBuilder.addParameter(
-                        ParameterSpec.builder(
-                                "skipMe",
-                                ProcessingContext.ignoreItClassName
-                        )
-                                .addAnnotation(SUPPRESS_SKIP_ME)
-                                .addModifiers(KModifier.VARARG)
-                                .build()
+                    ParameterSpec.builder(
+                        "skipMe",
+                        ProcessingContext.ignoreItClassName
+                    )
+                        .addAnnotation(SUPPRESS_SKIP_ME)
+                        .addModifiers(KModifier.VARARG)
+                        .build()
                 )
 
             constructorBuilder.addParameter(
-                    ParameterSpec.builder(
-                            name,
-                            type
-                    )
-                            .defaultValue(defaultValueLiteral, defaultValueValue)
-                            .build()
+                ParameterSpec.builder(
+                    name,
+                    type
+                )
+                    .defaultValue(defaultValueLiteral, defaultValueValue)
+                    .build()
             )
 
             typeBuilder.addProperty(
-                    kotlinProperty
-                            .initializer(defaultValueLiteral, defaultValueValue)
-                            .build()
+                kotlinProperty
+                    .initializer(defaultValueLiteral, defaultValueValue)
+                    .build()
             )
             propertyNum++
         }
@@ -192,22 +198,24 @@ class DTOGenerator(
          * No Arg Constructor
          */
         typeBuilder
-                .primaryConstructor(
-                        FunSpec
-                                .constructorBuilder()
-                                .addModifiers(KModifier.PRIVATE)
-                                .build()
-                )
+            .primaryConstructor(
+                FunSpec
+                    .constructorBuilder()
+                    .addModifiers(KModifier.PRIVATE)
+                    .build()
+            )
 
 
         typeBuilder
-                .addFunction(constructorBuilder
-                        .addCode(
-                                funAllArgsConstructorCode(typeBuilder.propertySpecs)
-                                        .build()
-                        )
-                        .callThisConstructor()
-                        .build())
+            .addFunction(
+                constructorBuilder
+                    .addCode(
+                        funAllArgsConstructorCode(typeBuilder.propertySpecs)
+                            .build()
+                    )
+                    .callThisConstructor()
+                    .build()
+            )
 
         if (impl.implementComparable)
             implementComparable(impl, typeBuilder)
@@ -221,8 +229,11 @@ class DTOGenerator(
         if (impl.implementEquals)
             implementEquals(impl, typeBuilder)
 
-        if(impl.implementToString)
+        if (impl.implementToString)
             implementToString(typeBuilder)
+
+        if (impl.implementCopy)
+            implementCopiable(typeBuilder, impl.implClassName)
 
         impl.typeSpec = typeBuilder.build()
 
@@ -232,8 +243,9 @@ class DTOGenerator(
          * Extension to create DTO instance from any class inheriting model interface
          */
         fileBuilder.addFunction(
-                funModelExtensionToBuilder(impl, typeBuilder.propertySpecs)
-                        .build())
+            funModelExtensionToBuilder(impl, typeBuilder.propertySpecs)
+                .build()
+        )
 
         fileSpecs.add(fileBuilder.build())
     }

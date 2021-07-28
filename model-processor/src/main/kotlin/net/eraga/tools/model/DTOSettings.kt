@@ -65,7 +65,9 @@ class DTOSettings(
 
         }
 
-        ProcessingContext.registerDTO(modelClassName, this)
+        ProcessingContext.registerDTO(
+            modelClassName,
+            memberModelClassName ?: modelClassName, this)
 
         if(implementAnnotation.implementAnnotations.isNotBlank())
             implementAnnotations = implementAnnotation.implementAnnotations

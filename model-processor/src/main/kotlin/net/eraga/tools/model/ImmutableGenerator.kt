@@ -92,7 +92,7 @@ class ImmutableGenerator(
 
             val defaultInit = propertyData.defaultInit
 
-            val type = determinePropertyType(element, propertyData)
+            val type = determinePropertyType(element, propertyData, this)
 
             val kotlinProperty = PropertySpec.builder(name, type)
                     .mutable(true)
@@ -207,7 +207,7 @@ class ImmutableGenerator(
         if (impl.implementCopy)
             implementCopiable(typeBuilder, impl.implClassName)
 
-        for (dtoImpl in ProcessingContext.listElementDTOs(impl.modelClassName)) {
+        for (dtoImpl in ProcessingContext.listModelDTOs(impl.modelClassName)) {
             funUpdateByBuilder(dtoImpl, typeBuilder, impl.implClassName)
         }
 

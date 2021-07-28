@@ -4,12 +4,10 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.ClassInspector
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import javax.annotation.processing.ProcessingEnvironment
-import javax.lang.model.element.TypeElement
 import javax.lang.model.util.Elements
 import javax.lang.model.util.Types
 
@@ -123,14 +121,45 @@ object ProcessingContext {
         }
     }
 
-    private val DTOsByElement = HashMap<TypeName, MutableList<DTOSettings>>()
-    fun listElementDTOs(typeElement: TypeName): List<DTOSettings> {
-        return DTOsByElement.getOrDefault(typeElement, mutableListOf())
+    private val DTOsByModel = HashMap<TypeName, MutableList<DTOSettings>>()
+    private val DTOsByImplementation = HashMap<TypeName, MutableList<DTOSettings>>()
+    private val immutablesByImplementation = HashMap<TypeName, MutableList<ImmutableSettings>>()
+
+    /**
+     * DTOs by parent model
+     */
+    fun listModelDTOs(modelClassName: TypeName): List<DTOSettings> {
+        return DTOsByModel.getOrDefault(modelClassName, mutableListOf())
     }
 
-    fun registerDTO(typeElement: TypeName, impl: DTOSettings) {
-        val list = DTOsByElement.getOrDefault(typeElement, mutableListOf())
-        list.add(impl)
-        DTOsByElement[typeElement] = list
+    /**
+     * DTOs by exact implementation
+     */
+    fun listImplementationDTOs(implClassName: TypeName): List<DTOSettings> {
+        return DTOsByImplementation.getOrDefault(implClassName, mutableListOf())
     }
+
+    /**
+     * Immutables by exact implementation
+     */
+    fun listModelImmutables(implClassName: TypeName): List<ImmutableSettings> {
+        return immutablesByImplementation.getOrDefault(implClassName, mutableListOf())
+    }
+
+    fun registerDTO(modelClassName: TypeName, implClassName: ClassName, impl: DTOSettings) {
+        val list = DTOsByModel.getOrDefault(modelClassName, mutableListOf())
+        list.add(impl)
+        DTOsByModel[modelClassName] = list
+
+        val listImpl = DTOsByImplementation.getOrDefault(implClassName, mutableListOf())
+        listImpl.add(impl)
+        DTOsByImplementation[implClassName] = listImpl
+    }
+
+    fun registerImmutable(modelClassName: TypeName, impl: ImmutableSettings) {
+        val list = immutablesByImplementation.getOrDefault(modelClassName, mutableListOf())
+        list.add(impl)
+        immutablesByImplementation[modelClassName] = list
+    }
+
 }

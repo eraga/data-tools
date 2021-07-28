@@ -41,8 +41,8 @@ interface WithSecondName {
 
 interface WithIdAndName : WithIntID, WithName
 
-@Immutable("")
 @Immutable
+@Immutable("")
 @DTO
 @DTO(suffix = "Update", propsForceNull = true)
 @Annotate("Person", Entity::class)
@@ -85,11 +85,18 @@ interface PersonModel :
 }
 
 
-@JPAEntity
+@Implement.Immutable("")
 interface PersonJPAModel : PersonModel {
     override var id: Int
     override val name: String
     override val secondName: String
+
+    val person: PersonModel
+
+    @DTO(propsForceNull = true)
+    interface CreateRequest : PersonJPAModel {
+        val something: PersonModel.UpdateIdNameRequest
+    }
 }
 
 data class Test2(

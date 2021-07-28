@@ -47,6 +47,8 @@ class ImmutableSettings(
 
         if(implementAnnotation.implementAnnotations.isNotBlank())
             implementAnnotations = implementAnnotation.implementAnnotations
+
+        ProcessingContext.registerImmutable(modelClassName, this)
     }
 
 }
