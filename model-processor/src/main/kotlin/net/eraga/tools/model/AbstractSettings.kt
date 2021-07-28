@@ -60,9 +60,12 @@ abstract class AbstractSettings<T>(
     val implementToString: Boolean = parentSettings.implToString
     val implementCopy: Boolean = modelElement.implements(Copiable::class)
 
-    val equalsSettings: Equals = modelElement.getAnnotation(Equals::class.java) ?: Equals::class.createInstance()
+    val equalsSettings: Equals = modelElement.getAnnotation(Equals::class.java)
+        ?: Equals::class.createInstance()
+
     val hashCodeSettings: HashCode = modelElement.getAnnotation(HashCode::class.java)
             ?: HashCode::class.createInstance()
+
     val comparableSettings: CompareTo = modelElement.getAnnotation(CompareTo::class.java)
             ?: CompareTo::class.createInstance()
 

@@ -182,7 +182,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 propertyData.propertySpec.type
         } else {
             try {
-                if(generator is DTOGenerator) {
+                if (generator is DTOGenerator) {
                     ProcessingContext.listImplementationDTOs(propertyData.propertySpec.type)
                         .first()
                         .implClassName
@@ -374,13 +374,24 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         settings: AbstractSettings<*>,
         propertySpecs: List<PropertySpec>
     ): FunSpec.Builder {
-        val paramName = settings.modelClassName.simpleName
+        val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecs
+
+        val paramName = settings.modelClassName.simpleName.replaceFirstChar { it.lowercase(Locale.getDefault()) }
+        val implName = settings.implClassName.simpleName
         val constructorBuilder = FunSpec.constructorBuilder()
         val funBodyBuilder = CodeBlock.builder()
         constructorBuilder.addParameter(paramName, settings.modelClassName)
-        if (propertySpecs.size > 0) {
+        if (propertySpecs.isNotEmpty()) {
             for (prop in propertySpecs) {
-                funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
+                val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
+                if (modelProp != null &&
+//                    modelProp.type.asClassName().simpleName == settings.modelClassName.simpleName
+                    modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
+                ) {
+                    funBodyBuilder.add("this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n", prop.name, prop.name)
+                } else {
+                    funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
+                }
             }
         }
 
@@ -394,16 +405,27 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         settings: AbstractSettings<*>,
         dtoPropertySpecs: List<PropertySpec>
     ): FunSpec.Builder {
+        val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecsIncludingInherited().values
+
         val extToBuilder = FunSpec.builder("to${settings.implClassName.simpleName}")
             .receiver(settings.modelClassName)
             .returns(settings.implClassName)
         val funBodyBuilder = CodeBlock.builder()
 
-        val modelPropNames = settings.modelClassName.asTypeSpec().propertySpecs.map { it.name }
+        val modelPropNames = modelPropertySpecs.map { it.name }
         val propertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
 
         if (propertySpecs.isNotEmpty()) {
-            val props = propertySpecs.joinToString { "${it.name} = this.${it.name}" }
+            val props = propertySpecs.joinToString {
+                val modelProp = modelPropertySpecs.firstOrNull { model -> model.name == it.name }
+                if (modelProp != null &&
+                    modelProp.type.asClassName().simpleName != it.type.asClassName().simpleName
+                ) {
+                    "${it.name} = this.${it.name}.to${it.type.asClassName().simpleName}()"
+                } else {
+                    "${it.name} = this.${it.name}"
+                }
+            }
             funBodyBuilder.addStatement("return ${settings.implClassName.simpleName}(%L)", props)
         }
 

@@ -224,6 +224,8 @@ class ImmutableGenerator(
             typeBuilder: TypeSpec.Builder,
             returns: ClassName
     ) {
+        val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecs
+
         val propertySpecs = settings.typeSpec.propertySpecs
         val param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
         val extToBuilder = FunSpec.builder("updateBy")
@@ -237,13 +239,27 @@ class ImmutableGenerator(
             if(prop.name !in parentPropNames)
                 continue
 
-            if (prop.type.isNullable &&
-                    !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable) {
+            val nullable = prop.type.isNullable &&
+                    !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable
+
+            val nullSafe = if(nullable) "!!" else ""
+
+            val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
+
+            val setValue = if (modelProp != null &&
+                modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
+            ) {
+                "this.${prop.name}.updateBy($param.${prop.name}$nullSafe)"
+            } else {
+                "this.${prop.name} = $param.${prop.name}$nullSafe"
+            }
+
+            if (nullable) {
                 funBodyBuilder.beginControlFlow("if($param.${prop.name} != null)")
-                funBodyBuilder.add("this.${prop.name} = $param.${prop.name}!!\n")
+                funBodyBuilder.add("$setValue\n")
                 funBodyBuilder.endControlFlow()
             } else
-                funBodyBuilder.add("this.${prop.name} = $param.${prop.name}\n")
+                funBodyBuilder.add("$setValue\n")
         }
         funBodyBuilder.add("return this")
 

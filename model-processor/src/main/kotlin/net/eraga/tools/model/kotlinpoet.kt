@@ -3,6 +3,7 @@ package net.eraga.tools.model
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.ImmutableKmClass
+import com.squareup.kotlinpoet.metadata.ImmutableKmType
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.classFor
 import com.squareup.kotlinpoet.metadata.specs.internal.ClassInspectorUtil
@@ -36,24 +37,38 @@ import kotlin.reflect.full.primaryConstructor
  */
 
 
+@KotlinPoetMetadataPreview
+fun TypeSpec.propertySpecsIncludingInherited(): Map<String, PropertySpec> {
+    val map = mutableMapOf<String, PropertySpec>()
+    this.superinterfaces.map { it.key.asTypeSpec() }.forEach {
+        map.putAll(it.propertySpecsIncludingInherited())
+    }
+
+    this.propertySpecs.forEach {
+        map[it.name] = it
+    }
+
+    return map
+}
+
 /**
  * Annotation value visitor adding members to the given builder instance.
  */
 private class AnnotationSpecVisitor(
-        val builder: CodeBlock.Builder
+    val builder: CodeBlock.Builder
 ) : SimpleAnnotationValueVisitor7<CodeBlock.Builder, String>(builder) {
 
     override fun defaultAction(o: Any, name: String) =
-            builder.add(memberForValue(o))
+        builder.add(memberForValue(o))
 
     override fun visitAnnotation(a: AnnotationMirror, name: String) =
-            builder.add("%L", AnnotationSpec.get(a))
+        builder.add("%L", AnnotationSpec.get(a))
 
     override fun visitEnumConstant(c: VariableElement, name: String) =
-            builder.add("%T.%L", c.asType(), c.simpleName)
+        builder.add("%T.%L", c.asType(), c.simpleName)
 
     override fun visitType(t: TypeMirror, name: String) =
-            builder.add("%T::class", t)
+        builder.add("%T::class", t)
 
     override fun visitArray(values: List<AnnotationValue>, name: String): CodeBlock.Builder {
         builder.add("[⇥⇥")
@@ -93,7 +108,7 @@ private class AnnotationSpecVisitor(
 }
 
 class AnnotationSpecMap(
-        val map: Map<String, Any>
+    val map: Map<String, Any>
 )
 
 fun AnnotationSpec.valueOf(name: String): Any? {
@@ -117,19 +132,20 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
 
     val instance = try {
-        if(kclass == Metadata::class)
+        if (kclass == Metadata::class)
             null
         else if (nonOptionalArgs == 0 && kclass.constructors.any { it.parameters.all { p -> p.isOptional } })
             kclass.createInstance()
         else if (nonOptionalArgs == 1 &&
-                kclass.memberProperties.first().returnType.classifier == String::class) {
+            kclass.memberProperties.first().returnType.classifier == String::class
+        ) {
             val initMap = kclass.constructors
-                    .first().parameters
-                    .filter { !it.isOptional }
-                    .associateBy({ it }, {
-                        (it.type.classifier as KClass<*>).createInstance()
-                    }
-                    )
+                .first().parameters
+                .filter { !it.isOptional }
+                .associateBy({ it }, {
+                    (it.type.classifier as KClass<*>).createInstance()
+                }
+                )
 
             kclass.constructors.first().callBy(initMap)
         } else null
@@ -143,11 +159,13 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
      * Extract repeatable annotations from containers
      */
     if (kclass.memberProperties.size == 1 &&
-            nonOptionalArgs == 1) {
+        nonOptionalArgs == 1
+    ) {
         val type = kclass.memberProperties.first().returnType.asTypeName()
         if (type is ParameterizedTypeName &&
-                type.typeArguments.size == 1 &&
-                type.typeArguments.first() is WildcardTypeName) {
+            type.typeArguments.size == 1 &&
+            type.typeArguments.first() is WildcardTypeName
+        ) {
             val typeName = (type.typeArguments.first() as WildcardTypeName).outTypes.first()
             val spec = typeName.asTypeSpec()
             if (spec.isAnnotation && spec.annotationSpecs.any { it.typeName.toString() == "kotlin.`annotation`.Repeatable" }) {
@@ -167,8 +185,8 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     val map: MutableMap<String, Any> = mutableMapOf()
 
     val builder = AnnotationSpec.builder(className)
-            .tag(this)
-            .tag(AnnotationSpecMap(map))
+        .tag(this)
+        .tag(AnnotationSpecMap(map))
 
     kclass.memberProperties.forEach {
         val member = CodeBlock.builder()
@@ -207,15 +225,15 @@ fun List<AnnotationSpec>.of(kclass: KClass<out Annotation>): List<AnnotationSpec
  * Has one or more of such annotations
  */
 fun List<AnnotationSpec>.has(
-        kclass: KClass<out Annotation>
+    kclass: KClass<out Annotation>
 ): Boolean {
     return of(kclass).isNotEmpty()
 }
 
 
 fun List<AnnotationSpec>.getValueOrNull(
-        kclass: KClass<out Annotation>,
-        name: String = "value"
+    kclass: KClass<out Annotation>,
+    name: String = "value"
 ): Any? {
     val annotation = of(kclass).singleOrNull() ?: return null
     val values = annotation.tag(AnnotationSpecMap::class)!!.map
@@ -225,9 +243,10 @@ fun List<AnnotationSpec>.getValueOrNull(
 }
 
 fun List<AnnotationSpec>.hasValueOf(
-        kclass: KClass<out Annotation>,
-        value: Any,
-        name: String = "value"): Boolean {
+    kclass: KClass<out Annotation>,
+    value: Any,
+    name: String = "value"
+): Boolean {
     if (isEmpty())
         return false
 
@@ -240,7 +259,7 @@ fun List<AnnotationSpec>.hasValueOf(
     val first = of(kclass).firstOrNull { annotation ->
         val values = annotation.tag(AnnotationSpecMap::class)!!.map
         val key = values.keys.firstOrNull { it == name }
-                ?: return@firstOrNull false
+            ?: return@firstOrNull false
 
         values[key]!! == value
     }
@@ -433,16 +452,16 @@ fun ClassName.implements(name: String): Boolean {
 }
 
 val KOTLIN_PRIMITIVE_TYPES = setOf(
-        UNIT,
-        BOOLEAN,
-        BYTE,
-        SHORT,
-        INT,
-        LONG,
-        CHAR,
-        FLOAT,
-        DOUBLE,
-        STRING
+    UNIT,
+    BOOLEAN,
+    BYTE,
+    SHORT,
+    INT,
+    LONG,
+    CHAR,
+    FLOAT,
+    DOUBLE,
+    STRING
 )
 
 
