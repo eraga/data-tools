@@ -426,9 +426,10 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 if (modelProp != null &&
                     modelProp.type.asClassName().simpleName != it.type.asClassName().simpleName
                 ) {
+                    val nonNullType = it.type.copy(nullable = false)
                     val dtoSettings = ProcessingContext.implementations
                         .filterIsInstance<DTOSettings>()
-                        .firstOrNull { sett -> sett.implClassName == it.type }
+                        .firstOrNull { sett -> sett.implClassName == nonNullType }
 
                     if (dtoSettings != null) {
                         settings.fileBuilder.addImport(dtoSettings.implClassName.packageName, "to${it.type.asClassName().simpleName}")

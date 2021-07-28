@@ -23,4 +23,10 @@ interface SomeModel {
     val name: String
 
     val otherModel: OtherModel
+
+    @Implement.DTO(propsForceNull = true)
+    interface Request: SomeModel {
+        @Implement.Omit
+        override val id: Long
+    }
 }
