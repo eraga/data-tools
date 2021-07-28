@@ -34,10 +34,7 @@ class DTOGenerator(
         val className = impl.implClassName
         println("           STARTING impl $className")
         val element = impl.modelElement
-        val fileBuilder = FileSpec.builder(
-            className.packageName,
-            className.simpleName
-        )
+        val fileBuilder = impl.fileBuilder
 
         val typeBuilder = TypeSpec
             .classBuilder(className)

@@ -1,6 +1,7 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
@@ -51,6 +52,8 @@ abstract class AbstractSettings<T>(
         protected set
 
     abstract val implClassName: ClassName
+
+    abstract val fileBuilder: FileSpec.Builder
 
     /**
      * Decided by ImplementationSettings

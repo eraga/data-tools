@@ -83,8 +83,6 @@ class ModelImplementationProcessor : AbstractProcessor() {
 //                .associateBy({ modelKeys.add(it as TypeElement); it }, {
 //                    it.getAnnotation(ImplementationTemplates::class.java).value.toMutableList()
 //                })
-        ProcessingContext.implementedModels = mutableListOf()
-
         /**
          * Getting grouped annotations
          */
@@ -128,21 +126,21 @@ class ModelImplementationProcessor : AbstractProcessor() {
          * Creating generators
          */
         dtoElements.forEach { (typeElement, implementations) ->
-            ProcessingContext.implementedModels.add(
-                    DTOGenerator(
-                            implementations.map { settings ->
-                                DTOSettings(typeElement, settings)
-                            }
-                    ))
+            val settings =  implementations.map { settings ->
+                DTOSettings(typeElement, settings)
+            }
+            ProcessingContext.implementations.addAll(settings)
+
+            ProcessingContext.implementedModels.add(DTOGenerator(settings))
         }
 
         immutableElements.forEach { (typeElement, implementations) ->
-            ProcessingContext.implementedModels.add(
-                    ImmutableGenerator(
-                            implementations.map { settings ->
-                                ImmutableSettings(typeElement, settings)
-                            }
-                    ))
+            val settings =  implementations.map { settings ->
+                ImmutableSettings(typeElement, settings)
+            }
+            ProcessingContext.implementations.addAll(settings)
+
+            ProcessingContext.implementedModels.add(ImmutableGenerator(settings))
         }
 
         /**

@@ -1,6 +1,7 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import net.eraga.tools.models.Implement
 import net.eraga.tools.models.Kind
@@ -30,6 +31,8 @@ class DTOSettings(
         private set
 
     override val implClassName: ClassName
+
+    override val fileBuilder: FileSpec.Builder
 
     init {
         implementComparable = true
@@ -71,10 +74,17 @@ class DTOSettings(
 
         if(implementAnnotation.implementAnnotations.isNotBlank())
             implementAnnotations = implementAnnotation.implementAnnotations
+
+        fileBuilder = FileSpec.builder(
+            implClassName.packageName,
+            implClassName.simpleName
+        )
     }
 
 
     override fun kclassKind(): Kind {
         return ownSettings.kind
     }
+
+
 }

@@ -33,9 +33,7 @@ class ImmutableGenerator(
     private fun generateImplementation(impl: ImmutableSettings) {
         val className = impl.implClassName
         val element = impl.modelElement
-        val fileBuilder = FileSpec.builder(
-                className.packageName,
-                className.simpleName)
+        val fileBuilder = impl.fileBuilder
 
         val typeBuilder = TypeSpec
                 .classBuilder(className)
@@ -44,7 +42,7 @@ class ImmutableGenerator(
         val kmClass = element.getAnnotation(Metadata::class.java)!!.toImmutableKmClass()
         val kmClassSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
 
-        kmClassSpec.superinterfaces.keys.first().asTypeSpec().superinterfaces
+//        kmClassSpec.superinterfaces.keys.first().asTypeSpec().superinterfaces
 
 
         var superinterfaces = mutableListOf<TypeName>(impl.modelClassName)

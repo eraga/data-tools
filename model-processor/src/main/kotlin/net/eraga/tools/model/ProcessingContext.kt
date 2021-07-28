@@ -26,7 +26,8 @@ import javax.lang.model.util.Types
 object ProcessingContext {
     val ignoreItClassName = ClassName("net.eraga.tools.models", "IgnoreIt")
 
-    lateinit var implementedModels: MutableList<AbstractGenerator<*>>
+    val implementedModels: MutableList<AbstractGenerator<*>> = mutableListOf()
+    val implementations: MutableList<AbstractSettings<*>> = mutableListOf()
 
     lateinit var classInspector: ClassInspector
         private set

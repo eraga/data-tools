@@ -10,19 +10,19 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import kotlin.Comparable
 
-/**
- * **Test2**
- *
- * TODO: Test2 description
- *
- * @author
- *  [Klaus Schwartz](mailto:klaus@eraga.net)
- *
- *  Developed at [eRaga InfoSystems](https://www.eraga.net/)
- *
- *  Date: 18/07/2021
- *  Time: 21:13
- */
+///**
+// * **Test2**
+// *
+// * TODO: Test2 description
+// *
+// * @author
+// *  [Klaus Schwartz](mailto:klaus@eraga.net)
+// *
+// *  Developed at [eRaga InfoSystems](https://www.eraga.net/)
+// *
+// *  Date: 18/07/2021
+// *  Time: 21:13
+// */
 interface WithAnyID {
     val id: Any
 }
@@ -98,11 +98,22 @@ interface PersonJPAModel : PersonModel {
         val something: PersonModel.UpdateIdNameRequest
     }
 }
+//
+//data class Test2(
+//    val a: String,
+//    val b: String
+//)
 
-data class Test2(
-    val a: String,
-    val b: String
-)
+//@Immutable
+//@DTO
+//interface IntModel: WithIntID
+//
+//@Immutable("")
+//@DTO
+//interface PersonModel: WithIntID {
+//    val person: PersonModel
+//    val int: IntModel
+//}
 
 fun main() {
     println("done")

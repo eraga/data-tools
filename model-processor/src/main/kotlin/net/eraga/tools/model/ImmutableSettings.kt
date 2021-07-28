@@ -1,6 +1,7 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import net.eraga.tools.models.*
 import javax.lang.model.element.NestingKind
@@ -27,6 +28,7 @@ class ImmutableSettings(
 
     override fun kclassKind(): Kind = ownSettings.kind
     override val implClassName: ClassName
+    override val fileBuilder: FileSpec.Builder
 
     init {
         implClassName = when (modelElement.nestingKind) {
@@ -49,6 +51,12 @@ class ImmutableSettings(
             implementAnnotations = implementAnnotation.implementAnnotations
 
         ProcessingContext.registerImmutable(modelClassName, this)
+
+        fileBuilder = FileSpec.builder(
+            implClassName.packageName,
+            implClassName.simpleName
+        )
     }
+
 
 }

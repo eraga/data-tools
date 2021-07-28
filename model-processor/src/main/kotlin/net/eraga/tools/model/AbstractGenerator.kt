@@ -388,7 +388,11 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 //                    modelProp.type.asClassName().simpleName == settings.modelClassName.simpleName
                     modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
                 ) {
-                    funBodyBuilder.add("this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n", prop.name, prop.name)
+                    funBodyBuilder.add(
+                        "this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n",
+                        prop.name,
+                        prop.name
+                    )
                 } else {
                     funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
                 }
@@ -412,6 +416,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             .returns(settings.implClassName)
         val funBodyBuilder = CodeBlock.builder()
 
+
         val modelPropNames = modelPropertySpecs.map { it.name }
         val propertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
 
@@ -421,6 +426,13 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 if (modelProp != null &&
                     modelProp.type.asClassName().simpleName != it.type.asClassName().simpleName
                 ) {
+                    val dtoSettings = ProcessingContext.implementations
+                        .filterIsInstance<DTOSettings>()
+                        .firstOrNull { sett -> sett.implClassName == it.type }
+
+                    if (dtoSettings != null) {
+                        settings.fileBuilder.addImport(dtoSettings.implClassName.packageName, "to${it.type.asClassName().simpleName}")
+                    }
                     "${it.name} = this.${it.name}.to${it.type.asClassName().simpleName}()"
                 } else {
                     "${it.name} = this.${it.name}"
