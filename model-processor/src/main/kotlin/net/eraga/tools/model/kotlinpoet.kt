@@ -152,6 +152,9 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
     } catch (e: NoSuchMethodException) {
         println("ERROR: NoSuchMethodException for ${e.message} while processing annotation $kclass")
         null
+    } catch (e: Exception) {
+        println("ERROR: ${e.message} while processing annotation $kclass")
+        null
     }
 
     val result = mutableListOf<AnnotationSpec>()
