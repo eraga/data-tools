@@ -1,6 +1,7 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
@@ -63,8 +64,15 @@ class ImmutableGenerator(
         }
 
         superinterfaces.forEach {
-            typeBuilder.addSuperinterface(it)
+            if(it == impl.modelClassName &&
+                impl.modelClassName.asTypeSpec().kind == TypeSpec.Kind.CLASS) {
+                typeBuilder.superclass(impl.modelClassName)
+            } else {
+                typeBuilder.addSuperinterface(it)
+            }
         }
+
+
 
         /**
          * Class annotations
@@ -83,7 +91,7 @@ class ImmutableGenerator(
 
 
         for ((_, propertyData) in gatheredProperties) {
-            if (propertyData.preventOverride)
+            if (propertyData.preventOverride || propertyData.isFinal)
                 continue
 
             val name = propertyData.propertySpec.name
@@ -103,7 +111,11 @@ class ImmutableGenerator(
                         )
             }
 
-            if (!propertyData.isFinal && superinterfaces.any {
+//            if(propertyData.propertySpec.name == "type") {
+//                println(propertyData.propertySpec.tags.values.filterIsInstance<ImmutableKmProperty>() )
+//            }
+
+            if (superinterfaces.any {
                         supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
                     })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)

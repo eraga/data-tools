@@ -113,7 +113,7 @@ class DTOGenerator(
         }
 
         for ((_, propertyData) in gatheredProperties) {
-            if (propertyData.preventOverride) {
+            if (propertyData.preventOverride || propertyData.isFinal) {
                 continue
             }
             val name = propertyData.propertySpec.name
@@ -139,7 +139,7 @@ class DTOGenerator(
 
 
 
-            if (!propertyData.isFinal && superinterfaces.any {
+            if (superinterfaces.any {
                     supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
                 })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)

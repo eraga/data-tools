@@ -1,10 +1,8 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.metadata.ImmutableKmClass
-import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
-import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.models.*
 import java.util.*
@@ -124,9 +122,9 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 defaultInit = defaultInit,
                 preventOverride = skip,
                 isInherited = level > 0,
-                propertySpec = typeSpec.propertySpecs.first { it.name == propName },
+                propertySpec = propertySpec,
                 additionalAnnotations = additionalAnnotations,
-                isFinal = propertySpec.modifiers.contains(KModifier.FINAL)
+                isFinal = propertySpec.tags.values.filterIsInstance<ImmutableKmProperty>().first().isFinal
             )
         }
         return getters

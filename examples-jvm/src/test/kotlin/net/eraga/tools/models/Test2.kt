@@ -115,6 +115,11 @@ interface PersonJPAModel : PersonModel {
 //    val int: IntModel
 //}
 
+@Implement.Immutable
+abstract class MeModel: WithIdAndName {
+    final val type = "something"
+}
+
 fun main() {
     println("done")
 
