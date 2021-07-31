@@ -125,7 +125,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 preventOverride = skip,
                 isInherited = level > 0,
                 propertySpec = typeSpec.propertySpecs.first { it.name == propName },
-                additionalAnnotations = additionalAnnotations
+                additionalAnnotations = additionalAnnotations,
+                isFinal = propertySpec.modifiers.contains(KModifier.FINAL)
             )
         }
         return getters

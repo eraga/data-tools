@@ -103,7 +103,7 @@ class ImmutableGenerator(
                         )
             }
 
-            if (superinterfaces.any {
+            if (!propertyData.isFinal && superinterfaces.any {
                         supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
                     })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
