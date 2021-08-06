@@ -419,9 +419,33 @@ fun TypeElement.implements(kclass: KClass<*>): Boolean {
 }
 
 @KotlinPoetMetadataPreview
+fun TypeName.implements(type: TypeName): Boolean {
+    if(this == type)
+        return true
+
+    val thisSpec = this.asTypeSpec()
+
+    if(thisSpec.superclass == type)
+        return true
+
+    thisSpec.superinterfaces.keys.forEach {
+        if(it.implements(type))
+            return true
+    }
+
+    if(this is ClassName)
+        return this.implements(type.toString())
+
+    return false
+}
+
+@KotlinPoetMetadataPreview
 fun ClassName.implements(name: String): Boolean {
     if (this in KOTLIN_ARRAY_INTERFACES)
         return false
+
+
+
 
     if (implementsInJava(name))
         return true

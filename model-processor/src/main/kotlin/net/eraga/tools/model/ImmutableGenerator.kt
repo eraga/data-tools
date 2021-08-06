@@ -351,31 +351,24 @@ class ImmutableGenerator(
                                 "$param.${prop.name}${nullSafe}.map { " +
                                 "${generic.asClassName().simpleName}().updateBy(it) " +
                                 "}"
-                    } else if (type.rawType.implements("Map")) {
+                    } else if (type.rawType.implements(Map::class.asTypeName())) {
                         val keyGeneric = type.typeArguments.first()
                         val valueGeneric = type.typeArguments.last()
 
+                        val implementedTypes = ProcessingContext.implementations.map { it.implClassName }
+
                         val keyMapper =
-                            if (keyGeneric != firstImplementationImmutable(keyGeneric)) {
-                                val keyGenericimpl = firstImplementationImmutable(keyGeneric)
-                                ".mapKeys { it.key.${registerAndGetExtForTypeName(keyGenericimpl, "as", settings)} }"
+                            if (keyGeneric in implementedTypes) {
+                                ".mapKeys { ${keyGeneric.asClassName().simpleName}().updateBy(it.key) }"
                             } else {
                                 ""
                             }
                         val valueMapper =
-                            if (valueGeneric != firstImplementationImmutable(valueGeneric)) {
-                                val valueGenericimpl = firstImplementationImmutable(valueGeneric)
-                                ".mapKeys { it.value.${
-                                    registerAndGetExtForTypeName(
-                                        valueGenericimpl,
-                                        "as",
-                                        settings
-                                    )
-                                } }"
+                            if (valueGeneric in implementedTypes) {
+                                ".mapValues { ${valueGeneric.asClassName().simpleName}().updateBy(it.value) }"
                             } else {
                                 ""
                             }
-
 
                         "this.${prop.name} = " +
                                 "$param.${prop.name}${nullSafe}$keyMapper$valueMapper"

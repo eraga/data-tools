@@ -25,7 +25,7 @@ interface SomeModel {
     val otherModel: OtherModel
 
     val otherModelCollection: List<OtherModel>
-    val otherModelMap: HashMap<String, OtherModel>
+    val otherModelMap: Map<String, OtherModel>
 
     @Implement.DTO(propsForceNull = true)
     interface Request: SomeModel {

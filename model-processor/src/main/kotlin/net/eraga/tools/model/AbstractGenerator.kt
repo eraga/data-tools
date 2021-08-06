@@ -414,16 +414,57 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                     if (modelProp != null &&
                         modelProp.type != firstImplementation(modelProp.type, settings)
                     ) {
-                        val typeName = registerAndGetExtForTypeName(
-                            modelProp.type,
-                            "as",
-                            settings)
+                        val type = firstImplementation(modelProp.type, settings)
+                        if (type is ParameterizedTypeName) {
+                            if (type.rawType.implements(Iterable::class.asTypeName())) {
+                                val typeName = registerAndGetExtForTypeName(
+                                    modelProp.type,
+                                    "as",
+                                    settings
+                                )
 
-                        funBodyBuilder.add(
-                            "this.%L = $paramName.%L.$typeName()\n",
-                            prop.name,
-                            prop.name
-                        )
+                                funBodyBuilder.add(
+                                    "this.%L = $paramName.%L.$typeName()\n",
+                                    prop.name,
+                                    prop.name
+                                )
+                            } else if (type.rawType.implements(Map::class.asTypeName())) {
+                                val keyGeneric = type.typeArguments.first()
+                                val valueGeneric = type.typeArguments.last()
+
+                                val implementedTypes = ProcessingContext.implementations.map { it.implClassName }
+
+                                val keyMapper =
+                                    if (keyGeneric in implementedTypes) {
+                                        ".mapKeys { ${keyGeneric.asClassName().simpleName}(it.key) }"
+                                    } else {
+                                        ""
+                                    }
+                                val valueMapper =
+                                    if (valueGeneric in implementedTypes) {
+                                        ".mapValues { ${valueGeneric.asClassName().simpleName}(it.value) }"
+                                    } else {
+                                        ""
+                                    }
+                                funBodyBuilder.add(
+                                    "this.%L = $paramName.%L$keyMapper$valueMapper\n",
+                                    prop.name,
+                                    prop.name
+                                )
+                            }
+                        } else {
+                            val typeName = registerAndGetExtForTypeName(
+                                modelProp.type,
+                                "as",
+                                settings
+                            )
+
+                            funBodyBuilder.add(
+                                "this.%L = $paramName.%L.$typeName()\n",
+                                prop.name,
+                                prop.name
+                            )
+                        }
                     } else {
                         funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
                     }
@@ -472,21 +513,12 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         }
         val typeName = typeClass.simpleName
 
-//        val settings = ProcessingContext.implementations
-//            .firstOrNull { sett -> sett.implClassName == typeClass }
-
         val extTypeName = "$prefix$typeName"
 
-//        if(settings != null) {
-            incSettings.fileBuilder.addImport(
-                typeClass.packageName,
-                "$prefix$typeName"
-            )
-            println("Added import of $extTypeName to ${incSettings.fileBuilder.name}")
-//        } else {
-//            println("Failed to import of $extTypeName to ${incType}")
-//        }
-
+        incSettings.fileBuilder.addImport(
+            typeClass.packageName,
+            "$prefix$typeName"
+        )
         return extTypeName
     }
 
@@ -511,9 +543,33 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 if (modelProp != null &&
                     modelProp.type != firstImplementationDTO(modelProp.type)
                 ) {
-                    val typeName: String = registerAndGetExtForTypeName(it.type, "to", settings)
+                    val type = firstImplementationDTO(modelProp.type)
+                    if (type is ParameterizedTypeName && type.rawType.implements(Map::class.asTypeName())) {
+                        val keyGeneric = type.typeArguments.first()
+                        val valueGeneric = type.typeArguments.last()
 
-                    "${it.name} = this.${it.name}.$typeName()"
+                        val implementedTypes = ProcessingContext.implementations.map { it.implClassName }
+
+                        val keyMapper =
+                            if (keyGeneric in implementedTypes) {
+                                val typeName: String = registerAndGetExtForTypeName(keyGeneric, "to", settings)
+                                ".mapKeys { it.key.$typeName() }"
+                            } else {
+                                ""
+                            }
+                        val valueMapper =
+                            if (valueGeneric in implementedTypes) {
+                                val typeName: String = registerAndGetExtForTypeName(valueGeneric, "to", settings)
+                                ".mapValues { it.value.$typeName() }"
+                            } else {
+                                ""
+                            }
+                        "${it.name} = this.${it.name}$keyMapper$valueMapper"
+                    } else {
+                        val typeName: String = registerAndGetExtForTypeName(it.type, "to", settings)
+
+                        "${it.name} = this.${it.name}.$typeName()"
+                    }
                 } else {
                     "${it.name} = this.${it.name}"
                 }
