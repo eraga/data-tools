@@ -1,9 +1,12 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
+import net.eraga.tools.model.ProcessingContext.firstImplementation
+import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
 import net.eraga.tools.models.*
 import java.util.*
 import javax.lang.model.element.*
@@ -191,29 +194,25 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             else
                 propertyData.propertySpec.type
         } else {
-            try {
-                if (generator is DTOGenerator) {
-                    ProcessingContext.listImplementationDTOs(propertyData.propertySpec.type)
-                        .first()
-                        .implClassName
-                } else {
-                    ProcessingContext.listModelImmutables(propertyData.propertySpec.type)
-                        .first()
-                        .implClassName
-                }
-            } catch (e: Exception) {
-                try {
-                    ProcessingContext.implementedModels
-                        .flatMap { it.listOfImplementations }
-                        .first { impl ->
-                            impl.implClassName == propertyData.propertySpec.type
-
-                        }.implClassName
-
-                } catch (_: NoSuchElementException) {
-                    propertyData.propertySpec.type
-                }
+//            try {
+            if (generator is DTOGenerator) {
+                ProcessingContext.firstImplementationDTO(propertyData.propertySpec.type)
+            } else {
+                ProcessingContext.firstImplementationImmutable(propertyData.propertySpec.type)
             }
+//            } catch (e: Exception) {
+//                try {
+//                    ProcessingContext.implementedModels
+//                        .flatMap { it.listOfImplementations }
+//                        .first { impl ->
+//                            impl.implClassName == propertyData.propertySpec.type
+//
+//                        }.implClassName
+//
+//                } catch (_: NoSuchElementException) {
+//                    propertyData.propertySpec.type
+//                }
+//            }
         }
     }
 
@@ -246,8 +245,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                                 impl.implClassName == type
                             }
 
-                        val meta = typeModel
-                        "${meta.implClassName}()"
+                        "${typeModel.implClassName}()"
                     } catch (e: NoSuchElementException) {
                         val classInitializer = type.classToInitializer(settings.classInitializers)
                         if (classInitializer.contains("NonExistentClass")) {
@@ -414,10 +412,15 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 if (prop.name !in defaultConstructorPropertiesNames) {
                     val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
                     if (modelProp != null &&
-                        modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
+                        modelProp.type != firstImplementation(modelProp.type, settings)
                     ) {
+                        val typeName = registerAndGetExtForTypeName(
+                            modelProp.type,
+                            "as",
+                            settings)
+
                         funBodyBuilder.add(
-                            "this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n",
+                            "this.%L = $paramName.%L.$typeName()\n",
                             prop.name,
                             prop.name
                         )
@@ -436,6 +439,56 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         return constructorBuilder
     }
 
+    fun funModelIterableExtensionBuilder(
+        settings: AbstractSettings<*>,
+        prefix: String
+    ): FunSpec.Builder {
+
+        val extToBuilder = FunSpec.builder("$prefix${settings.implClassName.simpleName}")
+            .receiver(
+                Iterable::class.asClassName().parameterizedBy(settings.modelClassName)
+            )
+
+        val funBodyBuilder = CodeBlock
+            .builder()
+            .add("return this.map { it.$prefix${settings.implClassName.simpleName}() }")
+
+        extToBuilder.addCode(funBodyBuilder.build())
+
+        return extToBuilder
+    }
+
+    fun registerAndGetExtForTypeName(
+        incType: TypeName,
+        prefix: String,
+        incSettings: AbstractSettings<*>
+    ): String {
+        val nonNullType = incType.copy(nullable = false)
+        val type = firstImplementation(nonNullType, incSettings)
+        val typeClass: ClassName = if (type is ParameterizedTypeName) {
+            type.typeArguments.singleOrNull()?.asClassName() ?: type.asClassName()
+        } else {
+            type.asClassName()
+        }
+        val typeName = typeClass.simpleName
+
+//        val settings = ProcessingContext.implementations
+//            .firstOrNull { sett -> sett.implClassName == typeClass }
+
+        val extTypeName = "$prefix$typeName"
+
+//        if(settings != null) {
+            incSettings.fileBuilder.addImport(
+                typeClass.packageName,
+                "$prefix$typeName"
+            )
+            println("Added import of $extTypeName to ${incSettings.fileBuilder.name}")
+//        } else {
+//            println("Failed to import of $extTypeName to ${incType}")
+//        }
+
+        return extTypeName
+    }
 
     fun funModelExtensionToBuilder(
         settings: AbstractSettings<*>,
@@ -453,23 +506,14 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         val propertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
 
         if (propertySpecs.isNotEmpty()) {
-            val props = propertySpecs.joinToString {
+            val props = propertySpecs.joinToString(",\n\t", "\n\t", "\n") {
                 val modelProp = modelPropertySpecs.firstOrNull { model -> model.name == it.name }
                 if (modelProp != null &&
-                    modelProp.type.asClassName().simpleName != it.type.asClassName().simpleName
+                    modelProp.type != firstImplementationDTO(modelProp.type)
                 ) {
-                    val nonNullType = it.type.copy(nullable = false)
-                    val dtoSettings = ProcessingContext.implementations
-                        .filterIsInstance<DTOSettings>()
-                        .firstOrNull { sett -> sett.implClassName == nonNullType }
+                    val typeName: String = registerAndGetExtForTypeName(it.type, "to", settings)
 
-                    if (dtoSettings != null) {
-                        settings.fileBuilder.addImport(
-                            dtoSettings.implClassName.packageName,
-                            "to${it.type.asClassName().simpleName}"
-                        )
-                    }
-                    "${it.name} = this.${it.name}.to${it.type.asClassName().simpleName}()"
+                    "${it.name} = this.${it.name}.$typeName()"
                 } else {
                     "${it.name} = this.${it.name}"
                 }

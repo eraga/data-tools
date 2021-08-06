@@ -57,6 +57,4 @@ class ImmutableSettings(
             implClassName.simpleName
         )
     }
-
-
 }

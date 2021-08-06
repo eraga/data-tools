@@ -5,6 +5,9 @@ import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
+import net.eraga.tools.model.ProcessingContext.firstImplementation
+import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
+import net.eraga.tools.model.ProcessingContext.firstImplementationImmutable
 import net.eraga.tools.models.Implement
 
 /**
@@ -87,7 +90,6 @@ class ImmutableGenerator(
             }
 
         implementAnnotates(typeBuilder, kmClassSpec, impl.implClassName.simpleName)
-
 
 
         val defaultConstructorProperties = mutableListOf<PropertySpec>()
@@ -275,7 +277,36 @@ class ImmutableGenerator(
 
         fileBuilder.addType(typeBuilder.build())
 
+
+        /**
+         * Extension to create DTO instance from any class inheriting model interface
+         */
+        fileBuilder.addFunction(
+            funModelExtensionAsBuilder(impl)
+                .build()
+        )
+        fileBuilder.addFunction(
+            funModelIterableExtensionBuilder(impl, "as")
+                .build()
+        )
+
         fileSpecs.add(fileBuilder.build())
+
+    }
+
+    private fun funModelExtensionAsBuilder(
+        settings: ImmutableSettings
+    ): FunSpec.Builder {
+        val extToBuilder = FunSpec.builder("as${settings.implClassName.simpleName}")
+            .receiver(settings.modelClassName)
+        val funBodyBuilder = CodeBlock.builder()
+
+        funBodyBuilder.addStatement("return ${settings.implClassName.simpleName}(this)")
+
+
+        extToBuilder.addCode(funBodyBuilder.build())
+
+        return extToBuilder
     }
 
     /**
@@ -309,9 +340,50 @@ class ImmutableGenerator(
             val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
 
             val setValue = if (modelProp != null &&
-                modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
+                modelProp.type != firstImplementation(modelProp.type, settings)
             ) {
-                "this.${prop.name}.updateBy($param.${prop.name}$nullSafe)"
+                val type = firstImplementationImmutable(modelProp.type)
+                if (type is ParameterizedTypeName) {
+
+                    if (type.rawType.implements("Iterable")) {
+                        val generic = type.typeArguments.first()
+                        "this.${prop.name} = " +
+                                "$param.${prop.name}${nullSafe}.map { " +
+                                "${generic.asClassName().simpleName}().updateBy(it) " +
+                                "}"
+                    } else if (type.rawType.implements("Map")) {
+                        val keyGeneric = type.typeArguments.first()
+                        val valueGeneric = type.typeArguments.last()
+
+                        val keyMapper =
+                            if (keyGeneric != firstImplementationImmutable(keyGeneric)) {
+                                val keyGenericimpl = firstImplementationImmutable(keyGeneric)
+                                ".mapKeys { it.key.${registerAndGetExtForTypeName(keyGenericimpl, "as", settings)} }"
+                            } else {
+                                ""
+                            }
+                        val valueMapper =
+                            if (valueGeneric != firstImplementationImmutable(valueGeneric)) {
+                                val valueGenericimpl = firstImplementationImmutable(valueGeneric)
+                                ".mapKeys { it.value.${
+                                    registerAndGetExtForTypeName(
+                                        valueGenericimpl,
+                                        "as",
+                                        settings
+                                    )
+                                } }"
+                            } else {
+                                ""
+                            }
+
+
+                        "this.${prop.name} = " +
+                                "$param.${prop.name}${nullSafe}$keyMapper$valueMapper"
+                    } else
+                        "this.${prop.name} = $param.${prop.name}${nullSafe}"
+                } else {
+                    "this.${prop.name}.updateBy($param.${prop.name}$nullSafe)"
+                }
             } else {
                 "this.${prop.name} = $param.${prop.name}$nullSafe"
             }
@@ -327,5 +399,7 @@ class ImmutableGenerator(
 
         extToBuilder.addCode(funBodyBuilder.build())
         typeBuilder.addFunction(extToBuilder.build())
+
+
     }
 }

@@ -243,6 +243,10 @@ class DTOGenerator(
             funModelExtensionToBuilder(impl, typeBuilder.propertySpecs)
                 .build()
         )
+        fileBuilder.addFunction(
+            funModelIterableExtensionBuilder(impl, "to")
+                .build()
+        )
 
         fileSpecs.add(fileBuilder.build())
     }

@@ -116,7 +116,7 @@ interface PersonJPAModel : PersonModel {
 //}
 
 @Implement.Immutable
-abstract class MeModel(): WithIdAndName {
+abstract class MeModel() : WithIdAndName {
     final val type = "something"
 
     @Implement.NoInit
@@ -129,7 +129,10 @@ abstract class MeModel(): WithIdAndName {
         id: Int,
         name: String,
         a: String
-    ): this()
+    ) : this()
+
+    val mapToSmth: String
+        get() = "get: $a"
 }
 
 fun main() {

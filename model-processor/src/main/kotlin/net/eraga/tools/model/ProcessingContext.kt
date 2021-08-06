@@ -2,6 +2,7 @@ package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
@@ -58,8 +59,8 @@ object ProcessingContext {
             return TypeSpec.interfaceBuilder(typeName).build()
         } else if (typeName is ParameterizedTypeName) {
             return TypeSpec.interfaceBuilder(typeName.rawType)
-                    .addTypes(typeName.typeArguments.map { it.asTypeSpec() })
-                    .build()
+                .addTypes(typeName.typeArguments.map { it.asTypeSpec() })
+                .build()
         } else {
             return TypeSpec.interfaceBuilder(typeName.toString()).build()
         }
@@ -68,7 +69,7 @@ object ProcessingContext {
     fun TypeName.asTypeSpec(): TypeSpec {
         val className = asClassName()
 
-        if(typeSpecs.contains(className))
+        if (typeSpecs.contains(className))
             return typeSpecs[className]!!
 
         if (className in KOTLIN_PRIMITIVE_TYPES) {
@@ -80,7 +81,7 @@ object ProcessingContext {
         /**
          * Этой хуйни нет нигде, да и хуй с ней, всё равно оно нахуй не надо
          */
-        if(className.isKotlinIntrinsic()) {
+        if (className.isKotlinIntrinsic()) {
             val typeSpec = makeTypeSpec(className)
 //            println("WARNING: Kotlin intrinsic ${className.canonicalName}, returning: ${typeSpec.name}")
             typeSpecs[className] = typeSpec
@@ -89,13 +90,13 @@ object ProcessingContext {
 
         try {
             val typeSpec = Class.forName(
-                    className.canonicalName
+                className.canonicalName
             )
-                    .toTypeSpec(classInspector)
+                .toTypeSpec(classInspector)
             typeSpecs[className] = typeSpec
             return typeSpec
-        } catch (_: ClassNotFoundException){}
-        catch (e: IllegalStateException) {
+        } catch (_: ClassNotFoundException) {
+        } catch (e: IllegalStateException) {
             val typeSpec = makeTypeSpec(className)
 //            println("WARNING: Not kotlin Class ${className.canonicalName}, returning: ${typeSpec.name}")
             typeSpecs[className] = typeSpec
@@ -104,7 +105,7 @@ object ProcessingContext {
 
         val typeElement = elements.getTypeElement(className.canonicalName)
 
-        if(typeElement == null) {
+        if (typeElement == null) {
 //            println("WARNING: ${className.canonicalName}: ${typeElement?.getAnnotation(kotlinMetaClass) != null}")
 //            print("INFO: ")
 //            kotlinToJava
@@ -133,18 +134,44 @@ object ProcessingContext {
         return DTOsByModel.getOrDefault(modelClassName, mutableListOf())
     }
 
+    private fun firstImplementation(
+        implClassName: TypeName,
+        from: Map<TypeName, MutableList<out AbstractSettings<*>>>
+    ): TypeName {
+        if (implClassName is ParameterizedTypeName) {
+            val raw: TypeName =
+                firstImplementation(implClassName.rawType, from)
+            val parameters = implClassName.typeArguments.map {
+                firstImplementation(it, from)
+            }
+            return raw.asClassName().parameterizedBy(parameters)
+        }
+        return from.getOrDefault(implClassName, mutableListOf()).firstOrNull()?.implClassName ?: implClassName
+    }
+
+    fun firstImplementation(implClassName: TypeName, settings: AbstractSettings<*>): TypeName {
+        if(settings is ImmutableSettings)
+            return firstImplementation(implClassName, immutablesByImplementation)
+
+        return firstImplementation(implClassName, DTOsByImplementation)
+    }
+
     /**
      * DTOs by exact implementation
      */
-    fun listImplementationDTOs(implClassName: TypeName): List<DTOSettings> {
-        return DTOsByImplementation.getOrDefault(implClassName, mutableListOf())
+    fun firstImplementationDTO(implClassName: TypeName): TypeName {
+        return firstImplementation(implClassName, DTOsByImplementation)
     }
+
+//    fun listImplementationDTOs(implClassName: TypeName): List<DTOSettings> {
+//        return DTOsByImplementation.getOrDefault(implClassName, mutableListOf())
+//    }
 
     /**
      * Immutables by exact implementation
      */
-    fun listModelImmutables(implClassName: TypeName): List<ImmutableSettings> {
-        return immutablesByImplementation.getOrDefault(implClassName, mutableListOf())
+    fun firstImplementationImmutable(implClassName: TypeName): TypeName {
+        return firstImplementation(implClassName, immutablesByImplementation)
     }
 
     fun registerDTO(modelClassName: TypeName, implClassName: ClassName, impl: DTOSettings) {
