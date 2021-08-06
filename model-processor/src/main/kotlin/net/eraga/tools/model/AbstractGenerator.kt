@@ -60,7 +60,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         val typeSpec = spec.singleTypeSpec()
         val supers = mutableListOf<TypeName>()
 
-        if(typeSpec.superclass != Any::class.asTypeName())
+        if (typeSpec.superclass != Any::class.asTypeName())
             supers.add(typeSpec.superclass)
 
         supers.addAll(typeSpec.superinterfaces.keys)
@@ -71,7 +71,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
             val typeVarsToArgs = mutableMapOf<String, TypeName>()
 
-            if(ifaceTypeVars != iface.typeArguments().map { it.toString() }) {
+            if (ifaceTypeVars != iface.typeArguments().map { it.toString() }) {
                 ifaceTypeVars.forEachIndexed { index, it ->
                     typeVarsToArgs[it] = iface.typeArguments()[index]
                 }
@@ -83,14 +83,35 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 level + 1
             )
             // Replace generic type varaiables
-            ifaceProperties.values.forEach {
-                if(it.propertySpec.type.toString() in typeVarsToArgs.keys) {
-                    val builder = it.propertySpec.toBuilder(
-                        type = typeVarsToArgs[it.propertySpec.type.toString()]!!
-                    )
-                    it.propertySpec = builder.build()
+
+            if (typeVarsToArgs.isNotEmpty())
+                ifaceProperties.values.forEach {
+                    val type = it.propertySpec.type
+                    if (type !is ParameterizedTypeName &&
+                        type.toString() in typeVarsToArgs.keys) {
+                        val builder = it.propertySpec.toBuilder(
+                            type = typeVarsToArgs[type.toString()]!!
+                        )
+                        it.propertySpec = builder.build()
+                    } else if(
+                        type is ParameterizedTypeName
+                    ) {
+                        val remappedTypeArgs = mutableListOf<TypeName>()
+                        type.typeArguments.forEach { typeArgument ->
+                            if(typeArgument.toString() in typeVarsToArgs.keys) {
+                                remappedTypeArgs.add(
+                                    typeVarsToArgs[typeArgument.toString()]!!
+                                )
+                            } else {
+                                remappedTypeArgs.add(typeArgument)
+                            }
+                        }
+                        val builder = it.propertySpec.toBuilder(
+                            type = type.rawType.parameterizedBy(remappedTypeArgs)
+                        )
+                        it.propertySpec = builder.build()
+                    }
                 }
-            }
 
             getters.putAll(
                 ifaceProperties

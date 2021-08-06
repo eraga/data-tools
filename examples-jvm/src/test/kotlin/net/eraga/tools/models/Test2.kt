@@ -112,8 +112,9 @@ interface SomeGeneric<T, E> {
     val genericParam: T
     val otherGeneric: E
     val andOneMoreGeneric: E
-//    val listWithGenerics: List<E>
-//    val mapWithGenerics: Map<T, E>
+    val listWithGenerics: List<E>
+    val mapWithGenerics: Map<T, E>
+    val anotherMapWithGenerics: Map<Long, E>
 }
 
 @Immutable
