@@ -116,8 +116,20 @@ interface PersonJPAModel : PersonModel {
 //}
 
 @Implement.Immutable
-abstract class MeModel: WithIdAndName {
+abstract class MeModel(): WithIdAndName {
     final val type = "something"
+
+    @Implement.NoInit
+    abstract override val id: Int
+
+    @Implement.NoInit
+    abstract var a: String
+
+    constructor(
+        id: Int,
+        name: String,
+        a: String
+    ): this()
 }
 
 fun main() {

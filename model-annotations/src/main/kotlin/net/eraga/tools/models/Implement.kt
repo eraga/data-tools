@@ -129,6 +129,22 @@ annotation class Implement {
 
     annotation class Initialized(vararg val value: Init)
 
+    /**
+     * Skips default init and moves property to constructor
+     *
+     * @param in which implementation, defaults to empty which matches all implementations
+     */
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(NotInitialized::class)
+    @Target(AnnotationTarget.PROPERTY)
+    @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
+    annotation class NoInit(
+        val `in`: String = ""
+    )
+
+    annotation class NotInitialized(vararg val value: NoInit)
 //    enum class InitScope {
 //        PROPERTY, PRIMARY_CONSTRUCTOR, SECONDARY_CONSTRUCTOR
 //    }
@@ -168,4 +184,6 @@ annotation class Implement {
     )
 
     annotation class Narrows(vararg val value: Narrow)
+
+
 }

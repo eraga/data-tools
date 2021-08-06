@@ -20,6 +20,7 @@ import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 @KotlinPoetMetadataPreview
 class PropertyData(
     val defaultInit: String?,
+    val constructorInit: Boolean,
     val preventOverride: Boolean,
     val isInherited: Boolean,
     val propertySpec: PropertySpec,

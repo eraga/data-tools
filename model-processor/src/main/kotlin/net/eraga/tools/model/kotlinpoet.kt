@@ -126,9 +126,19 @@ fun List<AnnotationSpec>.singleHaving(name: String, value: Any): AnnotationSpec?
 
 @KotlinPoetMetadataPreview
 fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
+    val result = mutableListOf<AnnotationSpec>()
+
     val className = ClassName.bestGuess(annotationType.toString())
 
-    val kclass = Class.forName(className.reflectionName()).kotlin
+    val kclass = try {
+        Class.forName(className.reflectionName()).kotlin
+    } catch (e: ClassNotFoundException) {
+//        println("DEBUG: ClassNotFoundException ${e.message} while processing annotation $className")
+        // fallback to default
+        result.add(AnnotationSpec.get(this))
+        return result
+    }
+
     val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
 
     val instance = try {
@@ -157,7 +167,6 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
         null
     }
 
-    val result = mutableListOf<AnnotationSpec>()
     /**
      * Extract repeatable annotations from containers
      */

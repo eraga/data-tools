@@ -1,7 +1,6 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
@@ -23,7 +22,7 @@ import net.eraga.tools.models.Implement
  */
 @KotlinPoetMetadataPreview
 class ImmutableGenerator(
-        listOfImplementations: List<ImmutableSettings>
+    listOfImplementations: List<ImmutableSettings>
 ) : AbstractGenerator<ImmutableSettings>(listOfImplementations) {
     override fun generate() {
         for (implementation in listOfImplementations) {
@@ -37,8 +36,8 @@ class ImmutableGenerator(
         val fileBuilder = impl.fileBuilder
 
         val typeBuilder = TypeSpec
-                .classBuilder(className)
-                .addModifiers(impl.classModifier)
+            .classBuilder(className)
+            .addModifiers(impl.classModifier)
 
         val kmClass = element.getAnnotation(Metadata::class.java)!!.toImmutableKmClass()
         val kmClassSpec = kmClass.toTypeSpec(ProcessingContext.classInspector)
@@ -64,8 +63,9 @@ class ImmutableGenerator(
         }
 
         superinterfaces.forEach {
-            if(it == impl.modelClassName &&
-                impl.modelClassName.asTypeSpec().kind == TypeSpec.Kind.CLASS) {
+            if (it == impl.modelClassName &&
+                impl.modelClassName.asTypeSpec().kind == TypeSpec.Kind.CLASS
+            ) {
                 typeBuilder.superclass(impl.modelClassName)
             } else {
                 typeBuilder.addSuperinterface(it)
@@ -73,22 +73,24 @@ class ImmutableGenerator(
         }
 
 
-
         /**
          * Class annotations
          */
         kmClassSpec.annotationSpecs
-                .filterNot { it.typeName != Implement.Annotate::class.asTypeName() }
-                .filter {
-                    impl.implementAnnotations.toRegex().matches(it.typeName.toString())
-                }
-                .forEach {
-                    if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
-                        typeBuilder.addAnnotation(it)
-                }
+            .filterNot { it.typeName != Implement.Annotate::class.asTypeName() }
+            .filter {
+                impl.implementAnnotations.toRegex().matches(it.typeName.toString())
+            }
+            .forEach {
+                if (it.typeName.asClassName().canonicalName !in IGNORED_ANNOTATIONS)
+                    typeBuilder.addAnnotation(it)
+            }
 
         implementAnnotates(typeBuilder, kmClassSpec, impl.implClassName.simpleName)
 
+
+
+        val defaultConstructorProperties = mutableListOf<PropertySpec>()
 
         for ((_, propertyData) in gatheredProperties) {
             if (propertyData.preventOverride || propertyData.isFinal)
@@ -101,14 +103,15 @@ class ImmutableGenerator(
             val type = determinePropertyType(element, propertyData, this)
 
             val kotlinProperty = PropertySpec.builder(name, type)
-                    .mutable(true)
+                .mutable(true)
 
             if (propertyData.propertySpec.setter == null && !propertyData.propertySpec.mutable) {
                 kotlinProperty
-                        .setter(FunSpec.setterBuilder()
-                                .addModifiers(KModifier.PRIVATE)
-                                .build()
-                        )
+                    .setter(
+                        FunSpec.setterBuilder()
+                            .addModifiers(KModifier.PRIVATE)
+                            .build()
+                    )
             }
 
 //            if(propertyData.propertySpec.name == "type") {
@@ -116,15 +119,16 @@ class ImmutableGenerator(
 //            }
 
             if (superinterfaces.any {
-                        supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
-                    })
+                    supersHaveThisProp(it.asTypeSpec(), propertyData.propertySpec)
+                })
                 kotlinProperty.addModifiers(KModifier.OVERRIDE)
 
 
             val defaultValue = defaultInit ?: constructorDefaultInitializer(
-                    impl,
-                    type,
-                    propertyData)
+                impl,
+                type,
+                propertyData
+            )
 
             val defaultValueLiteral = if (defaultValue.contains("\""))
                 "%S"
@@ -141,63 +145,111 @@ class ImmutableGenerator(
 
             if (impl.constructorVarargPosition == propertyNum)
                 constructorBuilder.addParameter(
-                        ParameterSpec.builder(
-                                "skipMe",
-                                ProcessingContext.ignoreItClassName
-                        )
-                                .addAnnotation(SUPPRESS_SKIP_ME)
-                                .addModifiers(KModifier.VARARG)
-                                .build()
+                    ParameterSpec.builder(
+                        "skipMe",
+                        ProcessingContext.ignoreItClassName
+                    )
+                        .addAnnotation(SUPPRESS_SKIP_ME)
+                        .addModifiers(KModifier.VARARG)
+                        .build()
                 )
 
-            constructorBuilder.addParameter(
-                    ParameterSpec.builder(
-                            name,
-                            type
-                    )
-                            .defaultValue(defaultValueLiteral, defaultValueValue)
-                            .build()
-            )
+            val constructorParam =
+                ParameterSpec.builder(
+                    name,
+                    type
+                )
+
+            if (!propertyData.constructorInit) {
+                constructorParam.defaultValue(defaultValueLiteral, defaultValueValue)
+                kotlinProperty
+                    .initializer(defaultValueLiteral, defaultValueValue)
+            } else {
+                kotlinProperty.initializer(propertyData.propertySpec.name)
+                defaultConstructorProperties.add(kotlinProperty.build())
+            }
 
             typeBuilder.addProperty(
-                    kotlinProperty
-                            .initializer(defaultValueLiteral, defaultValueValue)
-                            .build()
+                kotlinProperty
+                    .build()
             )
+
+            constructorBuilder.addParameter(
+                constructorParam.build()
+            )
+
             propertyNum++
         }
 
+        val code = defaultConstructorProperties
+            .map { it.name }
+            .joinToString(", ") {
+                "$it = $it"
+            }
+        val defaultConstructorArgs: CodeBlock = CodeBlock.builder().add(code).build()
+
+
         /**
-         * No Arg Constructor
+         * Primary Constructor
          */
-        typeBuilder
+        if (defaultConstructorProperties.isEmpty()) {
+            typeBuilder
                 .primaryConstructor(
-                        FunSpec
-                                .constructorBuilder()
-                                .addModifiers(KModifier.PRIVATE)
-                                .build()
+                    FunSpec
+                        .constructorBuilder()
+                        .addModifiers(KModifier.PRIVATE)
+                        .build()
                 )
+        } else {
+            val constructFun = FunSpec
+                .constructorBuilder()
 
+            for (prop in defaultConstructorProperties) {
+                constructFun.addParameter(prop.name, prop.type)
+            }
+
+            typeBuilder
+                .primaryConstructor(
+                    constructFun
+                        .build()
+                )
+        }
 
         typeBuilder
-                .addFunction(constructorBuilder
-                        .addCode(
-                                funAllArgsConstructorCode(typeBuilder.propertySpecs)
-                                        .build()
-                        )
-                        .callThisConstructor()
-                        .build())
+            .addFunction(
+                constructorBuilder
+                    .addCode(
+                        funAllArgsConstructorCode(typeBuilder.propertySpecs)
+                            .build()
+                    )
+                    .callThisConstructor(defaultConstructorArgs)
+                    .build()
+            )
+
+        /**
+         * Reimplement secondary constructors
+         */
+        for (constr in kmClassSpec.funSpecs.filter { it.isConstructor }) {
+            val builder = constr.toBuilder()
+                .callThisConstructor(defaultConstructorArgs)
+                .generateSetterCode(gatheredProperties.values.map { it.propertySpec })
+
+            typeBuilder.addFunction(builder.build())
+        }
 
         /**
          * Extension to create instance from any instance inheriting model interface
          */
         val modelConstructorBuilder = funModelConstructorBuilder(
-                impl, typeBuilder.propertySpecs
+            impl,
+            typeBuilder.propertySpecs,
+            defaultConstructorProperties
         )
         typeBuilder
-                .addFunction(modelConstructorBuilder
-                        .callThisConstructor()
-                        .build())
+            .addFunction(
+                modelConstructorBuilder
+                    .build()
+            )
 
         if (impl.implementComparable)
             implementComparable(impl, typeBuilder, impl.modelClassName)
@@ -230,29 +282,29 @@ class ImmutableGenerator(
      * Updates this class by data from other class
      */
     private fun funUpdateByBuilder(
-            settings: AbstractSettings<*>,
-            typeBuilder: TypeSpec.Builder,
-            returns: ClassName
+        settings: AbstractSettings<*>,
+        typeBuilder: TypeSpec.Builder,
+        returns: ClassName
     ) {
         val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecs
 
         val propertySpecs = settings.typeSpec.propertySpecs
         val param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
         val extToBuilder = FunSpec.builder("updateBy")
-                .addParameter(param, settings.implClassName)
-                .returns(returns)
+            .addParameter(param, settings.implClassName)
+            .returns(returns)
 
         val parentPropNames = typeBuilder.propertySpecs.map { it.name }
 
         val funBodyBuilder = CodeBlock.builder()
         for (prop in propertySpecs) {
-            if(prop.name !in parentPropNames)
+            if (prop.name !in parentPropNames)
                 continue
 
             val nullable = prop.type.isNullable &&
                     !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable
 
-            val nullSafe = if(nullable) "!!" else ""
+            val nullSafe = if (nullable) "!!" else ""
 
             val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
 

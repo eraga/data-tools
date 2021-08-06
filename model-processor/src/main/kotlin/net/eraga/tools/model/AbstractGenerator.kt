@@ -81,18 +81,28 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
             val simpleName = implClassName.simpleName
 
+            val noInits = annotations.of(Implement.NoInit::class)
+            val noInit = noInits.singleHaving("in", simpleName)
+                ?: noInits.singleHaving("in", "")
+            val constructorInit = noInit != null
+
             /**
              * Initializers
              */
-            val implementInits = annotations.of(Implement.Init::class)
-            val defaultInit = implementInits.singleHaving("in", simpleName)?.valueOf("with") as String?
-                ?: implementInits.singleHaving("in", "")?.valueOf("with") as String?
+            val defaultInit: String? = if (constructorInit) {
+                null
+            } else {
+                val implementInits = annotations.of(Implement.Init::class)
+                implementInits.singleHaving("in", simpleName)?.valueOf("with") as String?
+                    ?: implementInits.singleHaving("in", "")?.valueOf("with") as String?
+            }
 
             /**
              * Omitting prop implementation
              */
             val skip = annotations.hasValueOf(Implement.Omit::class, "", "in") ||
                     annotations.hasValueOf(Implement.Omit::class, simpleName, "in")
+
 
             /**
              * Annotations specific to implementation
@@ -120,6 +130,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
             getters[propName] = PropertyData(
                 defaultInit = defaultInit,
+                constructorInit = constructorInit,
                 preventOverride = skip,
                 isInherited = level > 0,
                 propertySpec = propertySpec,
@@ -356,6 +367,19 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         return funBodyBuilder
     }
 
+    fun FunSpec.Builder.generateSetterCode(
+        propertySpecs: List<PropertySpec>
+    ): FunSpec.Builder {
+        val propNames = propertySpecs.map { it.name }
+        for (param in parameters) {
+            if (param.name !in propNames)
+                continue
+
+            addCode("this.${param.name} = ${param.name}\n")
+        }
+        return this
+    }
+
     fun funAllArgsConstructorCode(
         propertySpecs: List<PropertySpec>
     ): CodeBlock.Builder {
@@ -371,34 +395,43 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
     fun funModelConstructorBuilder(
         settings: AbstractSettings<*>,
-        propertySpecs: List<PropertySpec>
+        propertySpecs: List<PropertySpec>,
+        defaultConstructorProperties: MutableList<PropertySpec>
     ): FunSpec.Builder {
         val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecs
+        val defaultConstructorPropertiesNames = defaultConstructorProperties.map { it.name }
 
         val paramName = settings.modelClassName.simpleName.replaceFirstChar { it.lowercase(Locale.getDefault()) }
         val implName = settings.implClassName.simpleName
         val constructorBuilder = FunSpec.constructorBuilder()
         val funBodyBuilder = CodeBlock.builder()
         constructorBuilder.addParameter(paramName, settings.modelClassName)
+
+        val thisCallParams = mutableListOf<String>()
+
         if (propertySpecs.isNotEmpty()) {
             for (prop in propertySpecs) {
-                val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
-                if (modelProp != null &&
-//                    modelProp.type.asClassName().simpleName == settings.modelClassName.simpleName
-                    modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
-                ) {
-                    funBodyBuilder.add(
-                        "this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n",
-                        prop.name,
-                        prop.name
-                    )
+                if (prop.name !in defaultConstructorPropertiesNames) {
+                    val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
+                    if (modelProp != null &&
+                        modelProp.type.asClassName().simpleName != prop.type.asClassName().simpleName
+                    ) {
+                        funBodyBuilder.add(
+                            "this.%L = ${prop.type.asClassName().simpleName}($paramName.%L)\n",
+                            prop.name,
+                            prop.name
+                        )
+                    } else {
+                        funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
+                    }
                 } else {
-                    funBodyBuilder.add("this.%L = $paramName.%L\n", prop.name, prop.name)
+                    thisCallParams.add(prop.name)
                 }
             }
         }
 
         constructorBuilder.addCode(funBodyBuilder.build())
+        constructorBuilder.callThisConstructor(thisCallParams.joinToString(", ") { "$it = $paramName.$it" })
 
         return constructorBuilder
     }
@@ -431,7 +464,10 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                         .firstOrNull { sett -> sett.implClassName == nonNullType }
 
                     if (dtoSettings != null) {
-                        settings.fileBuilder.addImport(dtoSettings.implClassName.packageName, "to${it.type.asClassName().simpleName}")
+                        settings.fileBuilder.addImport(
+                            dtoSettings.implClassName.packageName,
+                            "to${it.type.asClassName().simpleName}"
+                        )
                     }
                     "${it.name} = this.${it.name}.to${it.type.asClassName().simpleName}()"
                 } else {
