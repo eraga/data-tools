@@ -23,7 +23,7 @@ class PropertyData(
     val constructorInit: Boolean,
     val preventOverride: Boolean,
     val isInherited: Boolean,
-    val propertySpec: PropertySpec,
+    var propertySpec: PropertySpec,
     val additionalAnnotations: List<AnnotationSpec>,
     val isFinal: Boolean
 )

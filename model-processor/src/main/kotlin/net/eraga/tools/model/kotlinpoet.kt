@@ -419,21 +419,46 @@ fun TypeElement.implements(kclass: KClass<*>): Boolean {
 }
 
 @KotlinPoetMetadataPreview
+fun TypeName.asFileSpec(): FileSpec {
+    val (packageName, name) = when (this) {
+        is ClassName -> {
+            Pair(packageName, simpleName)
+        }
+        is ParameterizedTypeName -> {
+            Pair(rawType.packageName, rawType.simpleName)
+        }
+        else -> throw IllegalStateException("TypeName ${this::class.simpleName} can't be converted to FileSpec")
+//        is LambdaTypeName -> TODO()
+//        is TypeVariableName -> TODO()
+//        is WildcardTypeName -> TODO()
+    }
+    val fileSpec = FileSpec.builder(packageName, name)
+
+    fileSpec.addType(asTypeSpec())
+
+    return fileSpec.build()
+}
+
+fun FileSpec.singleTypeSpec(): TypeSpec {
+    return members.filterIsInstance<TypeSpec>().single()
+}
+
+@KotlinPoetMetadataPreview
 fun TypeName.implements(type: TypeName): Boolean {
-    if(this == type)
+    if (this == type)
         return true
 
     val thisSpec = this.asTypeSpec()
 
-    if(thisSpec.superclass == type)
+    if (thisSpec.superclass == type)
         return true
 
     thisSpec.superinterfaces.keys.forEach {
-        if(it.implements(type))
+        if (it.implements(type))
             return true
     }
 
-    if(this is ClassName)
+    if (this is ClassName)
         return this.implements(type.toString())
 
     return false

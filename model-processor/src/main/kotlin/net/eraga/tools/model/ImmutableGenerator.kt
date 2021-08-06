@@ -2,18 +2,18 @@ package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.specs.toFileSpec
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.model.ProcessingContext.firstImplementation
-import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
 import net.eraga.tools.model.ProcessingContext.firstImplementationImmutable
 import net.eraga.tools.models.Implement
 
 /**
- * **DTOGenerator**
+ * **ImmutableGenerator**
  *
- * Generates DTO [TypeSpec]s from single model interface
+ * Generates [Implement.Immutable] [TypeSpec]s from single model interface
  *
  * @author
  *  [Klaus Schwartz](mailto:klaus@eraga.net)
@@ -57,7 +57,9 @@ class ImmutableGenerator(
         val constructorBuilder = FunSpec.constructorBuilder()
 
         var propertyNum = 0
-        val gatheredProperties = gatherProperties(element, impl.implClassName)
+        val gatheredProperties = gatherProperties(
+            kmClass.toFileSpec(ProcessingContext.classInspector), impl.implClassName
+        )
 
         val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
 

@@ -3,6 +3,7 @@ package net.eraga.tools.model
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.specs.toFileSpec
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
@@ -100,7 +101,9 @@ class DTOGenerator(
 
         var propertyNum = 0
 
-        val gatheredProperties = gatherProperties(element, className)
+        val gatheredProperties = gatherProperties(
+            kmClass.toFileSpec(ProcessingContext.classInspector), className
+        )
 
         val skippedProperties = gatheredProperties.filter { it.value.preventOverride }
 

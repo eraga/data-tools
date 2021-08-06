@@ -108,12 +108,19 @@ interface PersonModel :
 //@DTO
 //interface IntModel: WithIntID
 //
-//@Immutable("")
-//@DTO
-//interface PersonModel: WithIntID {
-//    val person: PersonModel
-//    val int: IntModel
-//}
+interface SomeGeneric<T, E> {
+    val genericParam: T
+    val otherGeneric: E
+    val andOneMoreGeneric: E
+//    val listWithGenerics: List<E>
+//    val mapWithGenerics: Map<T, E>
+}
+
+@Immutable
+interface GenericModel: SomeGeneric<Long, Map<String, Long>> {
+    @NoInit
+    override val otherGeneric: Map<String, Long>
+}
 
 @Implement.Immutable
 abstract class MeModel() : WithIdAndName {

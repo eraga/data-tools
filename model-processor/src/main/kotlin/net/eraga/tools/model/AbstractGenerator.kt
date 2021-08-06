@@ -3,7 +3,6 @@ package net.eraga.tools.model
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.*
-import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.model.ProcessingContext.firstImplementation
 import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
@@ -53,34 +52,55 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         protected set
 
     fun gatherProperties(
-        element: TypeElement,
+        spec: FileSpec,
         implClassName: ClassName,
         level: Int = 0
     ): Map<String, PropertyData> {
         val getters = LinkedHashMap<String, PropertyData>()
+        val typeSpec = spec.singleTypeSpec()
+        val supers = mutableListOf<TypeName>()
 
-        for (iface in element.interfaces) {
-            val realElement = ProcessingContext.types.asElement(iface)
+        if(typeSpec.superclass != Any::class.asTypeName())
+            supers.add(typeSpec.superclass)
 
-            if (realElement is TypeElement) {
-                getters.putAll(gatherProperties(realElement, implClassName, level + 1))
+        supers.addAll(typeSpec.superinterfaces.keys)
+
+        for (iface in supers) {
+            val ifaceFileSpec = iface.asFileSpec()
+            val ifaceTypeVars = ifaceFileSpec.singleTypeSpec().typeVariables.map { it.toString() }
+
+            val typeVarsToArgs = mutableMapOf<String, TypeName>()
+
+            if(ifaceTypeVars != iface.typeArguments().map { it.toString() }) {
+                ifaceTypeVars.forEachIndexed { index, it ->
+                    typeVarsToArgs[it] = iface.typeArguments()[index]
+                }
             }
+
+            val ifaceProperties = gatherProperties(
+                iface.asFileSpec(),
+                implClassName,
+                level + 1
+            )
+            // Replace generic type varaiables
+            ifaceProperties.values.forEach {
+                if(it.propertySpec.type.toString() in typeVarsToArgs.keys) {
+                    val builder = it.propertySpec.toBuilder(
+                        type = typeVarsToArgs[it.propertySpec.type.toString()]!!
+                    )
+                    it.propertySpec = builder.build()
+                }
+            }
+
+            getters.putAll(
+                ifaceProperties
+            )
         }
-
-        val metadata = element.getAnnotation(Metadata::class.java)
-            ?: // println("NOTICE: Skipping ${element.qualifiedName} as it has no Kotlin Metadata")
-            return getters
-
-        val kmClass = metadata.toImmutableKmClass()
-        val typeSpec = kmClass.toTypeSpec(
-            ProcessingContext.classInspector
-        )
 
         typeSpec.propertySpecs.forEach { propertySpec ->
             val annotations = propertySpec.annotations //+ (propertySpec.getter?.annotations ?: emptySet())
 
             val propName = propertySpec.name
-//            val defaultInit = annotations.getValueOrNull(Implement.Init::class, "with") as String?
 
             val simpleName = implClassName.simpleName
 
@@ -117,20 +137,6 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 annotationBuilderFromAnnotate(annotationSpec).build()
             }
 
-//            if(additionalAnnotations.isNotEmpty()) {
-//                println(additionalAnnotations)
-//            }
-
-//            if (implClassName.simpleName.contains("ImmutablePerson") &&
-//                    propName == "id" &&
-//                    level == 0) {
-//                println("At element: ${element.simpleName}:")
-//                annotations.hasValueOf(Implement.Omit::class, "", "in")
-//                println("   $implClassName:$propName !!!!PASS!!!!: $skip")
-//                println("   prop: ${annotations.map { it.typeName }}")
-//                println("   gett: ${propertySpec.getter?.annotations?.map { it.typeName }}")
-//            }
-
             getters[propName] = PropertyData(
                 defaultInit = defaultInit,
                 constructorInit = constructorInit,
@@ -149,6 +155,9 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         propertyData: PropertyData,
         generator: AbstractGenerator<*>
     ): TypeName {
+        if (propertyData.propertySpec.type.toString() == "T") {
+            println(propertyData.propertySpec.type.toString())
+        }
         return if (propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
 
 //                propertyData.typeSpec.syntheticMethodForAnnotations
@@ -400,7 +409,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         val defaultConstructorPropertiesNames = defaultConstructorProperties.map { it.name }
 
         val paramName = settings.modelClassName.simpleName.replaceFirstChar { it.lowercase(Locale.getDefault()) }
-        val implName = settings.implClassName.simpleName
+//        val implName = settings.implClassName.simpleName
         val constructorBuilder = FunSpec.constructorBuilder()
         val funBodyBuilder = CodeBlock.builder()
         constructorBuilder.addParameter(paramName, settings.modelClassName)
