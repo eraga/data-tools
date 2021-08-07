@@ -7,8 +7,8 @@ import com.squareup.kotlinpoet.metadata.*
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.model.ProcessingContext.firstImplementation
 import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
+import net.eraga.tools.model.ProcessingContext.firstImplementationImmutable
 import net.eraga.tools.models.*
-import net.eraga.tools.models.Implement.AnnotationSetting.Target
 import net.eraga.tools.models.Implement.AnnotationSetting.Target.*
 import java.util.*
 import javax.lang.model.element.*
@@ -86,16 +86,19 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 implClassName,
                 level + 1
             )
+            if(ifaceProperties.values.filter { it.propertySpec.type.toString() =="T?" }.isNotEmpty()) {
+                println(typeVarsToArgs)
+            }
             // Replace generic type varaiables
-
             if (typeVarsToArgs.isNotEmpty())
                 ifaceProperties.values.forEach {
-                    val type = it.propertySpec.type
+                    val isNullable = it.propertySpec.type.isNullable
+                    val type = it.propertySpec.type.copy(nullable = false)
                     if (type !is ParameterizedTypeName &&
                         type.toString() in typeVarsToArgs.keys
                     ) {
                         val builder = it.propertySpec.toBuilder(
-                            type = typeVarsToArgs[type.toString()]!!
+                            type = typeVarsToArgs[type.toString()]!!.copy(nullable = isNullable)
                         )
                         it.propertySpec = builder.build()
                     } else if (
@@ -103,16 +106,19 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                     ) {
                         val remappedTypeArgs = mutableListOf<TypeName>()
                         type.typeArguments.forEach { typeArgument ->
-                            if (typeArgument.toString() in typeVarsToArgs.keys) {
+                            val itIsNullable = typeArgument.isNullable
+                            val itType = typeArgument.copy(nullable = false)
+
+                            if (itType.toString() in typeVarsToArgs.keys) {
                                 remappedTypeArgs.add(
-                                    typeVarsToArgs[typeArgument.toString()]!!
+                                    typeVarsToArgs[itType.toString()]!!.copy(nullable = itIsNullable)
                                 )
                             } else {
                                 remappedTypeArgs.add(typeArgument)
                             }
                         }
                         val builder = it.propertySpec.toBuilder(
-                            type = type.rawType.parameterizedBy(remappedTypeArgs)
+                            type = type.rawType.parameterizedBy(remappedTypeArgs).copy(nullable = isNullable)
                         )
                         it.propertySpec = builder.build()
                     }
@@ -253,9 +259,6 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         propertyData: PropertyData,
         generator: AbstractGenerator<*>
     ): TypeName {
-        if (propertyData.propertySpec.type.toString() == "T") {
-            println(propertyData.propertySpec.type.toString())
-        }
         return if (propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
 
 //                propertyData.typeSpec.syntheticMethodForAnnotations
@@ -301,25 +304,11 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             else
                 propertyData.propertySpec.type
         } else {
-//            try {
             if (generator is DTOGenerator) {
-                ProcessingContext.firstImplementationDTO(propertyData.propertySpec.type)
+                firstImplementationDTO(propertyData.propertySpec.type)
             } else {
-                ProcessingContext.firstImplementationImmutable(propertyData.propertySpec.type)
+                firstImplementationImmutable(propertyData.propertySpec.type)
             }
-//            } catch (e: Exception) {
-//                try {
-//                    ProcessingContext.implementedModels
-//                        .flatMap { it.listOfImplementations }
-//                        .first { impl ->
-//                            impl.implClassName == propertyData.propertySpec.type
-//
-//                        }.implClassName
-//
-//                } catch (_: NoSuchElementException) {
-//                    propertyData.propertySpec.type
-//                }
-//            }
         }
     }
 

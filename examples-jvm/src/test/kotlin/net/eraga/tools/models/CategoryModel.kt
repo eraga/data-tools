@@ -3,6 +3,9 @@ package net.eraga.tools.models
 import net.eraga.commons.Copiable
 import net.eraga.tools.models.Implement.AnnotationSetting.Target.FIELD
 import net.eraga.tools.models.Implement.AnnotationSetting.Target.NONE
+import java.io.Serializable
+import java.math.BigDecimal
+import java.time.LocalDateTime
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -36,4 +39,20 @@ interface CategoryModel :
     @get:Column(nullable = false, unique = true)
     val weight: Int
     val name: String
+
+    @Implement.DTO
+    interface SomethingLong : Something<DigitalProposalDetails>
+
+    interface Something<T : ProposalDetails> : WithLongId {
+        val value: T?
+    }
+}
+
+open class DigitalProposalDetails(
+    val inventoryIds: Collection<Long>,
+    val discount: BigDecimal,
+) : ProposalDetails()
+
+abstract class ProposalDetails : Serializable {
+    val _className: String = this::class.java.canonicalName
 }

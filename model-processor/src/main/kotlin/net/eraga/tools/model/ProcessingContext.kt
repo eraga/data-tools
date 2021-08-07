@@ -135,9 +135,10 @@ object ProcessingContext {
     }
 
     private fun firstImplementation(
-        implClassName: TypeName,
+        className: TypeName,
         from: Map<TypeName, MutableList<out AbstractSettings<*>>>
     ): TypeName {
+        val implClassName = className.copy(nullable = false)
         if (implClassName is ParameterizedTypeName) {
             val raw: TypeName =
                 firstImplementation(implClassName.rawType, from)
@@ -146,7 +147,11 @@ object ProcessingContext {
             }
             return raw.asClassName().parameterizedBy(parameters)
         }
-        return from.getOrDefault(implClassName, mutableListOf()).firstOrNull()?.implClassName ?: implClassName
+        return from
+            .getOrDefault(implClassName, mutableListOf())
+            .firstOrNull()
+            ?.implClassName
+            ?.copy(nullable = className.isNullable) ?: className
     }
 
     fun firstImplementation(implClassName: TypeName, settings: AbstractSettings<*>): TypeName {
