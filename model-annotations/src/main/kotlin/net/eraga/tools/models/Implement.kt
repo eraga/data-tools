@@ -40,12 +40,12 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class DTO(
-            val prefix: String = "",
-            val suffix: String = "",
-            val kind: Kind = Kind.FINAL_CLASS,
-            val propsForceNull: Boolean = false,
-            val propsDefaultOmit: Boolean = false,
-            val implementAnnotations: String = ""
+        val prefix: String = "",
+        val suffix: String = "",
+        val kind: Kind = Kind.FINAL_CLASS,
+        val propsForceNull: Boolean = false,
+        val propsDefaultOmit: Boolean = false,
+        val implementAnnotations: String = ""
     )
 
     /**
@@ -66,10 +66,10 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class Immutable(
-            val prefix: String = "Immutable",
-            val suffix: String = "",
-            val kind: Kind = Kind.FINAL_CLASS,
-            val implementAnnotations: String = ""
+        val prefix: String = "Immutable",
+        val suffix: String = "",
+        val kind: Kind = Kind.FINAL_CLASS,
+        val implementAnnotations: String = ""
     )
 
     /**
@@ -84,10 +84,10 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class JPAEntity(
-            val prefix: String = "",
-            val suffix: String = "",
-            val kind: Kind = Kind.FINAL_CLASS,
-            val implementAnnotations: String = ""
+        val prefix: String = "",
+        val suffix: String = "",
+        val kind: Kind = Kind.FINAL_CLASS,
+        val implementAnnotations: String = ""
     )
 
 
@@ -121,8 +121,8 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class Init(
-            val with: String,
-            val `in`: String = ""
+        val with: String,
+        val `in`: String = ""
 //            TODO:
 //            vararg val scopes: InitScope = []
     )
@@ -160,17 +160,89 @@ annotation class Implement {
      */
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")
-    @java.lang.annotation.Repeatable(Annotations::class)
+    @java.lang.annotation.Repeatable(Annotates::class)
     @Target(AnnotationTarget.PROPERTY, AnnotationTarget.CLASS)
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class Annotate(
-            val `in`: String,
-            val with: KClass<out Annotation>,
-            vararg val args: String = []
+        val `in`: String = "",
+        val with: KClass<out Annotation>,
+        vararg val args: String = [],
     )
 
-    annotation class Annotations(vararg val value: Annotate)
+    annotation class Annotates(vararg val value: Annotate)
+
+    /**
+     * TODO Doc
+     */
+    @Repeatable
+    @Suppress("DEPRECATED_JAVA_ANNOTATION")
+    @java.lang.annotation.Repeatable(AnnotationSettings::class)
+    @Target(AnnotationTarget.PROPERTY, AnnotationTarget.CLASS)
+    @Retention(AnnotationRetention.SOURCE)
+    @MustBeDocumented
+    annotation class AnnotationSetting(
+        vararg val classes: KClass<out Annotation> = [],
+        val target: Target = Target.INHERIT,
+        val `in`: String = ".*"
+    ) {
+        @Suppress("unused")
+        enum class Target(
+            val siteTarget: String
+        ) {
+            /**
+             * Remove annotation site-target
+             */
+            NONE(""),
+
+            /**
+             * Don't change annotation site-target
+             */
+            INHERIT(""),
+
+            FILE("file"),
+
+            /**
+             * (annotations with this target are not visible to Java)
+             */
+            PROPERTY("property"),
+
+            FIELD("field"),
+
+            /**
+             * (property getter)
+             */
+            GET("get"),
+
+            /**
+             * (property setter)
+             */
+            SET("set"),
+
+            /**
+             * (receiver parameter of an extension function or property)
+             */
+            RECEIVER("receiver"),
+
+            /**
+             * (constructor parameter)
+             */
+            PARAM("param"),
+
+            /**
+             * (property setter parameter)
+             */
+            SETPARAM("setparam"),
+
+            /**
+             * (the field storing the delegate instance for a delegated property)
+             */
+            DELEGATE("delegate"),
+        }
+    }
+
+
+    annotation class AnnotationSettings(vararg val value: AnnotationSetting)
 
     @Repeatable
     @Suppress("DEPRECATED_JAVA_ANNOTATION")
@@ -179,8 +251,8 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class Narrow(
-            val `in`: String,
-            val with: String
+        val `in`: String,
+        val with: String
     )
 
     annotation class Narrows(vararg val value: Narrow)

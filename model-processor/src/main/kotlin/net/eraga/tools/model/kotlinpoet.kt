@@ -11,6 +11,7 @@ import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import kotlinx.metadata.KmProperty
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
+import net.eraga.tools.models.Implement
 import javax.lang.model.element.AnnotationMirror
 import javax.lang.model.element.AnnotationValue
 import javax.lang.model.element.TypeElement
@@ -141,31 +142,37 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
 
     val nonOptionalArgs = kclass.constructors.first().parameters.filter { !it.isOptional }.size
 
-    val instance = try {
-        if (kclass == Metadata::class)
-            null
-        else if (nonOptionalArgs == 0 && kclass.constructors.any { it.parameters.all { p -> p.isOptional } })
-            kclass.createInstance()
-        else if (nonOptionalArgs == 1 &&
-            kclass.memberProperties.first().returnType.classifier == String::class
-        ) {
-            val initMap = kclass.constructors
-                .first().parameters
-                .filter { !it.isOptional }
-                .associateBy({ it }, {
-                    (it.type.classifier as KClass<*>).createInstance()
-                }
-                )
+    // We need to preset default values only for our own annotations
+    val instance = if (
+        kclass.qualifiedName?.startsWith(Implement::class.qualifiedName!!) != true
+    )
+        null
+    else
+        try {
+            if (kclass == Metadata::class)
+                null
+            else if (nonOptionalArgs == 0 && kclass.constructors.any { it.parameters.all { p -> p.isOptional } })
+                kclass.createInstance()
+            else if (nonOptionalArgs == 1 &&
+                kclass.memberProperties.first().returnType.classifier == String::class
+            ) {
+                val initMap = kclass.constructors
+                    .first().parameters
+                    .filter { !it.isOptional }
+                    .associateBy({ it }, {
+                        (it.type.classifier as KClass<*>).createInstance()
+                    }
+                    )
 
-            kclass.constructors.first().callBy(initMap)
-        } else null
-    } catch (e: NoSuchMethodException) {
-        println("WARNING: NoSuchMethodException for ${e.message} while processing annotation $kclass")
-        null
-    } catch (e: Exception) {
-        println("WARNING: ${e.message} while processing annotation $kclass")
-        null
-    }
+                kclass.constructors.first().callBy(initMap)
+            } else null
+        } catch (e: NoSuchMethodException) {
+            println("WARNING: NoSuchMethodException for ${e.message} while processing annotation $kclass")
+            null
+        } catch (e: Exception) {
+            println("WARNING: ${e.message} while processing annotation $kclass")
+            null
+        }
 
     /**
      * Extract repeatable annotations from containers
@@ -210,18 +217,21 @@ fun AnnotationMirror.asAnnotationSpec(): List<AnnotationSpec> {
             val value = elementValues[key]!!
             value.accept(visitor, name)
             map[name] = value.value
+            builder.addMember(member.build())
         } else {
             // Try to fill annotation with default values if there was no-arg constructor
-//            val visitor = KmProperty()
-//            kmClass.properties.first { prop->prop.name == it.name }.accept(visitor)
             if (instance != null) {
                 member.add("%L = ", name)
                 val value: Any = it.getter.call(instance)!!
-                member.add("%L", value)
+                if(value is String)
+                    member.add("%L", "\"$value\"")
+                else
+                    member.add("%L", value)
+
                 map[name] = value
+                builder.addMember(member.build())
             }
         }
-        builder.addMember(member.build())
     }
 
     return result.apply { add(builder.build()) }
@@ -328,20 +338,19 @@ fun List<AnnotationSpec>.hasValueOf(
 }
 
 
-@OptIn(DelicateKotlinPoetApi::class)
-@KotlinPoetMetadataPreview
-fun TypeMirror.asClassName(): TypeName {
-    return try {
-        val kmClass = toImmutableKmClass()!!
-        val parameters = kmClass.typeParameters
-        ClassName(kmClass.moduleName!!, kmClass.name).apply {
-            if (parameters.isNotEmpty())
-                parameterizedBy(parameters.map { ClassName("", it.name) })
-        }
-    } catch (e: Exception) {
-        asTypeName()
-    }
-}
+//@KotlinPoetMetadataPreview
+//fun TypeMirror.asClassName(): TypeName {
+//    return try {
+//        val kmClass = toImmutableKmClass()!!
+//        val parameters = kmClass.typeParameters
+//        ClassName(kmClass.moduleName!!, kmClass.name).apply {
+//            if (parameters.isNotEmpty())
+//                parameterizedBy(parameters.map { ClassName("", it.name) })
+//        }
+//    } catch (e: Exception) {
+//        asTypeName()
+//    }
+//}
 
 @KotlinPoetMetadataPreview
 fun TypeMirror.toImmutableKmClass(): ImmutableKmClass? {
