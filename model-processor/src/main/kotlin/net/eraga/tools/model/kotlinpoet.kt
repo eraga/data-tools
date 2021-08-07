@@ -116,6 +116,11 @@ fun AnnotationSpec.valueOf(name: String): Any? {
     return tag(AnnotationSpecMap::class)?.map?.get(name)
 }
 
+fun AnnotationSpec.arrayValueOf(name: String): List<AnnotationValue>? {
+    @Suppress("UNCHECKED_CAST")
+    return tag(AnnotationSpecMap::class)?.map?.get(name) as List<AnnotationValue>?
+}
+
 fun List<AnnotationSpec>.allHaving(name: String, value: Any): List<AnnotationSpec> {
     return filter { it.valueOf(name) == value }
 }

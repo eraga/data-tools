@@ -1,16 +1,20 @@
 package net.eraga.tools.model
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.AnnotationSpec.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.*
 import net.eraga.tools.model.ProcessingContext.asTypeSpec
 import net.eraga.tools.model.ProcessingContext.firstImplementation
 import net.eraga.tools.model.ProcessingContext.firstImplementationDTO
 import net.eraga.tools.models.*
+import net.eraga.tools.models.Implement.AnnotationSetting.Target
+import net.eraga.tools.models.Implement.AnnotationSetting.Target.*
 import java.util.*
 import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import kotlin.NoSuchElementException
+import kotlin.reflect.KClass
 
 /**
  * **AbstractGenerator**
@@ -88,17 +92,18 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 ifaceProperties.values.forEach {
                     val type = it.propertySpec.type
                     if (type !is ParameterizedTypeName &&
-                        type.toString() in typeVarsToArgs.keys) {
+                        type.toString() in typeVarsToArgs.keys
+                    ) {
                         val builder = it.propertySpec.toBuilder(
                             type = typeVarsToArgs[type.toString()]!!
                         )
                         it.propertySpec = builder.build()
-                    } else if(
+                    } else if (
                         type is ParameterizedTypeName
                     ) {
                         val remappedTypeArgs = mutableListOf<TypeName>()
                         type.typeArguments.forEach { typeArgument ->
-                            if(typeArgument.toString() in typeVarsToArgs.keys) {
+                            if (typeArgument.toString() in typeVarsToArgs.keys) {
                                 remappedTypeArgs.add(
                                     typeVarsToArgs[typeArgument.toString()]!!
                                 )
@@ -118,7 +123,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             )
         }
 
-        typeSpec.propertySpecs.forEach { propertySpec ->
+        typeSpec.propertySpecs.forEach { originalPropertySpec ->
+            var propertySpec = originalPropertySpec
             val annotations = propertySpec.annotations //+ (propertySpec.getter?.annotations ?: emptySet())
 
             val propName = propertySpec.name
@@ -129,6 +135,77 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             val noInit = noInits.singleHaving("in", simpleName)
                 ?: noInits.singleHaving("in", "")
             val constructorInit = noInit != null
+
+            /**
+             * Annotation settings
+             */
+            val annotationReplacements = mutableMapOf<AnnotationSpec, AnnotationSpec>()
+            val annotationSettings = annotations.of(Implement.AnnotationSetting::class)
+            if (annotationSettings.isNotEmpty()) {
+                val correctedAnnotations = mutableListOf<AnnotationSpec>()
+                annotationSettings.forEach { annotation ->
+                    @Suppress("UNCHECKED_CAST")
+                    val classes = annotation.arrayValueOf("classes")!!
+                        .map { type ->
+                            (type.value as DeclaredType).asElement()
+                        }
+                        .filterIsInstance<TypeElement>()
+                        .map {
+                            Class.forName(it.qualifiedName.toString()).kotlin as KClass<out Annotation>
+                        }
+
+                    val targetElement = annotation.valueOf("target") as VariableElement
+                    val target = valueOf(targetElement.simpleName.toString())
+//                    println(classes?.first())
+                    for (kclass in classes) {
+                        println("$kclass to $target")
+                        val annosToReplace = annotations.of(kclass)
+                        if (annosToReplace.isEmpty())
+                            continue
+                        for (anno in annosToReplace) {
+                            when (target) {
+                                NONE -> {
+                                    if (anno.useSiteTarget == null)
+                                        continue
+                                    annotationReplacements[anno] =
+                                        anno.toBuilder()
+                                            .useSiteTarget(null)
+                                            .build()
+                                }
+                                INHERIT -> {
+                                }
+                                else -> {
+                                    if (anno.useSiteTarget != null &&
+                                        anno.useSiteTarget!!.name.lowercase() == target.siteTarget)
+                                        continue
+
+                                    annotationReplacements[anno] =
+                                        anno.toBuilder()
+                                            .useSiteTarget(
+                                                UseSiteTarget.valueOf(target.name)
+                                            )
+                                            .build()
+                                }
+                            }
+                        }
+                    }
+                }
+//                annotations.of()
+            }
+
+            if (annotationReplacements.isNotEmpty()) {
+                val replacedAnnotations = mutableListOf<AnnotationSpec>()
+                annotations.forEach {
+                    if (it in annotationReplacements)
+                        replacedAnnotations.add(annotationReplacements[it]!!)
+                    else
+                        replacedAnnotations.add(it)
+                }
+                val newPropSpec = propertySpec.toBuilder()
+                newPropSpec.annotations.clear()
+                newPropSpec.annotations.addAll(replacedAnnotations)
+                propertySpec = newPropSpec.build()
+            }
 
             /**
              * Initializers
@@ -781,7 +858,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
             .addFunction(compareToFun.build())
     }
 
-    private fun annotationBuilderFromAnnotate(annotationSpec: AnnotationSpec): AnnotationSpec.Builder {
+    private fun annotationBuilderFromAnnotate(annotationSpec: AnnotationSpec): Builder {
         val type = annotationSpec.valueOf("with") as DeclaredType
 
         @Suppress("UNCHECKED_CAST")

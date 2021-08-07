@@ -182,9 +182,9 @@ annotation class Implement {
     @Retention(AnnotationRetention.SOURCE)
     @MustBeDocumented
     annotation class AnnotationSetting(
-        vararg val classes: KClass<out Annotation> = [],
+        vararg val classes: KClass<out Annotation>,
         val target: Target = Target.INHERIT,
-        val `in`: String = ".*"
+//        val `in`: String = ".*"
     ) {
         @Suppress("unused")
         enum class Target(
