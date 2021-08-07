@@ -334,10 +334,13 @@ class ImmutableGenerator(
             if (prop.name !in parentPropNames)
                 continue
 
-            val nullable = prop.type.isNullable &&
-                    !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable
+            val nullSafeCall = if(prop.type.isNullable) "?" else ""
 
-            val nullSafe = if (nullable) "!!" else ""
+            val nullable = prop.type.isNullable
+//                    &&
+//                    !typeBuilder.propertySpecs.first { it.name == prop.name }.type.isNullable
+
+            val notNullSafe = if (nullable) "!!" else ""
 
             val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
 
@@ -350,8 +353,8 @@ class ImmutableGenerator(
                     if (type.rawType.implements("Iterable")) {
                         val generic = type.typeArguments.first()
                         "this.${prop.name} = " +
-                                "$param.${prop.name}${nullSafe}.map { " +
-                                "${generic.asClassName().simpleName}().updateBy(it) " +
+                                "$param.${prop.name}${notNullSafe}.map { " +
+                                "${generic.asClassName().simpleName}()$nullSafeCall.updateBy(it) " +
                                 "}"
                     } else if (type.rawType.implements(Map::class.asTypeName())) {
                         val keyGeneric = type.typeArguments.first()
@@ -361,26 +364,26 @@ class ImmutableGenerator(
 
                         val keyMapper =
                             if (keyGeneric in implementedTypes) {
-                                ".mapKeys { ${keyGeneric.asClassName().simpleName}().updateBy(it.key) }"
+                                ".mapKeys { ${keyGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.key) }"
                             } else {
                                 ""
                             }
                         val valueMapper =
                             if (valueGeneric in implementedTypes) {
-                                ".mapValues { ${valueGeneric.asClassName().simpleName}().updateBy(it.value) }"
+                                ".mapValues { ${valueGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.value) }"
                             } else {
                                 ""
                             }
 
                         "this.${prop.name} = " +
-                                "$param.${prop.name}${nullSafe}$keyMapper$valueMapper"
+                                "$param.${prop.name}${notNullSafe}$keyMapper$valueMapper"
                     } else
-                        "this.${prop.name} = $param.${prop.name}${nullSafe}"
+                        "this.${prop.name} = $param.${prop.name}${notNullSafe}"
                 } else {
-                    "this.${prop.name}.updateBy($param.${prop.name}$nullSafe)"
+                    "this.${prop.name}$nullSafeCall.updateBy($param.${prop.name}$notNullSafe)"
                 }
             } else {
-                "this.${prop.name} = $param.${prop.name}$nullSafe"
+                "this.${prop.name} = $param.${prop.name}$notNullSafe"
             }
 
             if (nullable) {

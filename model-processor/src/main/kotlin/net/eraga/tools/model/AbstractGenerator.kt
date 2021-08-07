@@ -505,6 +505,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
         if (propertySpecs.isNotEmpty()) {
             for (prop in propertySpecs) {
+                val nullSafeCall = if(prop.type.isNullable) "?" else ""
                 if (prop.name !in defaultConstructorPropertiesNames) {
                     val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
                     if (modelProp != null &&
@@ -542,8 +543,9 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                                     } else {
                                         ""
                                     }
+                                val nullSafe = if(keyMapper.isNotBlank() || valueMapper.isNotBlank()) nullSafeCall else ""
                                 funBodyBuilder.add(
-                                    "this.%L = $paramName.%L$keyMapper$valueMapper\n",
+                                    "this.%L = $paramName.%L$nullSafe$keyMapper$valueMapper\n",
                                     prop.name,
                                     prop.name
                                 )
@@ -556,7 +558,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                             )
 
                             funBodyBuilder.add(
-                                "this.%L = $paramName.%L.$typeName()\n",
+                                "this.%L = $paramName.%L$nullSafeCall.$typeName()\n",
                                 prop.name,
                                 prop.name
                             )
@@ -636,9 +638,12 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         if (propertySpecs.isNotEmpty()) {
             val props = propertySpecs.joinToString(",\n\t", "\n\t", "\n") {
                 val modelProp = modelPropertySpecs.firstOrNull { model -> model.name == it.name }
+
                 if (modelProp != null &&
                     modelProp.type != firstImplementationDTO(modelProp.type)
                 ) {
+                    val nullSafeCall = if(modelProp.type.isNullable) "?" else ""
+
                     val type = firstImplementationDTO(modelProp.type)
                     if (type is ParameterizedTypeName && type.rawType.implements(Map::class.asTypeName())) {
                         val keyGeneric = type.typeArguments.first()
@@ -660,11 +665,11 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                             } else {
                                 ""
                             }
-                        "${it.name} = this.${it.name}$keyMapper$valueMapper"
+                        "${it.name} = this.${it.name}$nullSafeCall$keyMapper$valueMapper"
                     } else {
                         val typeName: String = registerAndGetExtForTypeName(it.type, "to", settings)
 
-                        "${it.name} = this.${it.name}.$typeName()"
+                        "${it.name} = this.${it.name}$nullSafeCall.$typeName()"
                     }
                 } else {
                     "${it.name} = this.${it.name}"

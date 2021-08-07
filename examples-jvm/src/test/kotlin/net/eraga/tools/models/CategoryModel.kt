@@ -3,6 +3,7 @@ package net.eraga.tools.models
 import net.eraga.commons.Copiable
 import net.eraga.tools.models.Implement.AnnotationSetting.Target.FIELD
 import net.eraga.tools.models.Implement.AnnotationSetting.Target.NONE
+import net.eraga.tools.models.sub2.OtherModel
 import java.io.Serializable
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -38,13 +39,15 @@ interface CategoryModel :
 
     @get:Column(nullable = false, unique = true)
     val weight: Int
-    val name: String
+    val name: String?
+    val other: OtherModel?
 
     @Implement.DTO
     interface SomethingLong : Something<DigitalProposalDetails>
 
     interface Something<T : ProposalDetails> : WithLongId {
         val value: T?
+        val other: OtherModel?
     }
 }
 
