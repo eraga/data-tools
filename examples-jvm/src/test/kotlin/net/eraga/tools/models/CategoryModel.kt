@@ -22,6 +22,11 @@ import javax.persistence.Id
  *  Date: 07/08/2021
  *  Time: 12:53
  */
+@Implement.Immutable
+interface SomeOtherModel {
+    val data: String
+}
+
 interface WithEntityLongId : WithLongId {
     @Implement.AnnotationSetting(Id::class, target = NONE)
     @Implement.AnnotationSetting(Column::class, target = FIELD)
@@ -42,12 +47,19 @@ interface CategoryModel :
     val name: String?
     val other: OtherModel?
 
+    val lalala: SomeOtherModel
+    val lalalaList: List<SomeOtherModel>
+
+    val something: ProposalDetails?
+
     @Implement.DTO
     interface SomethingLong : Something<DigitalProposalDetails>
 
     interface Something<T : ProposalDetails> : WithLongId {
-        val value: T?
+        val something: T?
         val other: OtherModel?
+        val lalala: SomeOtherModel
+        val lalalaList: List<SomeOtherModel>
     }
 }
 

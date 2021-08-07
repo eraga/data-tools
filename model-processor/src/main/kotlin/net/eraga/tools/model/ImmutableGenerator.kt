@@ -274,7 +274,7 @@ class ImmutableGenerator(
             implementCopiable(typeBuilder, impl.implClassName)
 
         for (dtoImpl in ProcessingContext.listModelDTOs(impl.modelClassName)) {
-            funUpdateByBuilder(dtoImpl, typeBuilder, impl.implClassName)
+            funUpdateByBuilder(dtoImpl, impl, typeBuilder, impl.implClassName)
         }
 
         fileBuilder.addType(typeBuilder.build())
@@ -315,22 +315,24 @@ class ImmutableGenerator(
      * Updates this class by data from other class
      */
     private fun funUpdateByBuilder(
-        settings: AbstractSettings<*>,
+        dtoSettings: DTOSettings,
+        immutableSettings: ImmutableSettings,
         typeBuilder: TypeSpec.Builder,
         returns: ClassName
     ) {
-        val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecs
+        val modelPropertySpecs = dtoSettings.modelClassName.asTypeSpec().propertySpecs
 
-        val propertySpecs = settings.typeSpec.propertySpecs
-        val param = settings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
+        val dtoPropertySpecs = dtoSettings.typeSpec.propertySpecs
+        val dtoParam = dtoSettings.implClassName.simpleName.replaceFirstChar { it.lowercase() }
         val extToBuilder = FunSpec.builder("updateBy")
-            .addParameter(param, settings.implClassName)
+            .addParameter(dtoParam, dtoSettings.implClassName)
             .returns(returns)
 
         val parentPropNames = typeBuilder.propertySpecs.map { it.name }
+        val immutablePropertySpecs = typeBuilder.propertySpecs
 
         val funBodyBuilder = CodeBlock.builder()
-        for (prop in propertySpecs) {
+        for (prop in dtoPropertySpecs) {
             if (prop.name !in parentPropNames)
                 continue
 
@@ -343,51 +345,63 @@ class ImmutableGenerator(
             val notNullSafe = if (nullable) "!!" else ""
 
             val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
+            val immutableProp = immutablePropertySpecs.firstOrNull { it.name == prop.name }
 
             val setValue = if (modelProp != null &&
-                modelProp.type != firstImplementation(modelProp.type, settings)
+                modelProp.type != firstImplementation(modelProp.type, dtoSettings)
             ) {
                 val type = firstImplementationImmutable(modelProp.type)
                 if (type is ParameterizedTypeName) {
+                    when {
+                        type.rawType.implements("Iterable") -> {
+                            val generic = type.typeArguments.first()
+                            "this.${prop.name} = " +
+                                    "$dtoParam.${prop.name}${notNullSafe}.map { " +
+                                    "${generic.asClassName().simpleName}()$nullSafeCall.updateBy(it) " +
+                                    "}"
+                        }
+                        type.rawType.implements(Map::class.asTypeName()) -> {
+                            val keyGeneric = type.typeArguments.first()
+                            val valueGeneric = type.typeArguments.last()
 
-                    if (type.rawType.implements("Iterable")) {
-                        val generic = type.typeArguments.first()
-                        "this.${prop.name} = " +
-                                "$param.${prop.name}${notNullSafe}.map { " +
-                                "${generic.asClassName().simpleName}()$nullSafeCall.updateBy(it) " +
-                                "}"
-                    } else if (type.rawType.implements(Map::class.asTypeName())) {
-                        val keyGeneric = type.typeArguments.first()
-                        val valueGeneric = type.typeArguments.last()
+                            val implementedTypes = ProcessingContext.implementations.map { it.implClassName }
 
-                        val implementedTypes = ProcessingContext.implementations.map { it.implClassName }
+                            val keyMapper =
+                                if (keyGeneric in implementedTypes) {
+                                    ".mapKeys { ${keyGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.key) }"
+                                } else {
+                                    ""
+                                }
+                            val valueMapper =
+                                if (valueGeneric in implementedTypes) {
+                                    ".mapValues { ${valueGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.value) }"
+                                } else {
+                                    ""
+                                }
 
-                        val keyMapper =
-                            if (keyGeneric in implementedTypes) {
-                                ".mapKeys { ${keyGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.key) }"
-                            } else {
-                                ""
-                            }
-                        val valueMapper =
-                            if (valueGeneric in implementedTypes) {
-                                ".mapValues { ${valueGeneric.asClassName().simpleName}()$nullSafeCall.updateBy(it.value) }"
-                            } else {
-                                ""
-                            }
-
-                        "this.${prop.name} = " +
-                                "$param.${prop.name}${notNullSafe}$keyMapper$valueMapper"
-                    } else
-                        "this.${prop.name} = $param.${prop.name}${notNullSafe}"
+                            "this.${prop.name} = " +
+                                    "$dtoParam.${prop.name}${notNullSafe}$keyMapper$valueMapper"
+                        }
+                        else -> "this.${prop.name} = $dtoParam.${prop.name}${notNullSafe}"
+                    }
                 } else {
-                    "this.${prop.name}$nullSafeCall.updateBy($param.${prop.name}$notNullSafe)"
+                    "this.${prop.name}$nullSafeCall.updateBy($dtoParam.${prop.name}$notNullSafe)"
                 }
+            } else if(immutableProp != null && immutableProp.type == prop.type){
+                "this.${prop.name} = $dtoParam.${prop.name}$notNullSafe"
+            } else if(modelProp != null && prop.type == modelProp.type) {
+                val extFun = registerAndGetExtForTypeName(
+                    modelProp.type,
+                    "as",
+                    immutableSettings
+                )
+                "this.${prop.name} = $dtoParam.${prop.name}$notNullSafe.$extFun()"
             } else {
-                "this.${prop.name} = $param.${prop.name}$notNullSafe"
+                "this.${prop.name} = $dtoParam.${prop.name}$notNullSafe"
             }
 
             if (nullable) {
-                funBodyBuilder.beginControlFlow("if($param.${prop.name} != null)")
+                funBodyBuilder.beginControlFlow("if($dtoParam.${prop.name} != null)")
                 funBodyBuilder.add("$setValue\n")
                 funBodyBuilder.endControlFlow()
             } else

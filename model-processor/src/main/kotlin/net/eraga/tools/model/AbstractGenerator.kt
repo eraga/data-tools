@@ -621,23 +621,23 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
     }
 
     fun funModelExtensionToBuilder(
-        settings: AbstractSettings<*>,
+        dtoSettings: AbstractSettings<*>,
         dtoPropertySpecs: List<PropertySpec>
     ): FunSpec.Builder {
-        val modelPropertySpecs = settings.modelClassName.asTypeSpec().propertySpecsIncludingInherited().values
+        val modelPropertySpecs = dtoSettings.modelClassName.asTypeSpec().propertySpecsIncludingInherited().values
 
-        val extToBuilder = FunSpec.builder("to${settings.implClassName.simpleName}")
-            .receiver(settings.modelClassName)
-            .returns(settings.implClassName)
+        val extToBuilder = FunSpec.builder("to${dtoSettings.implClassName.simpleName}")
+            .receiver(dtoSettings.modelClassName)
+            .returns(dtoSettings.implClassName)
         val funBodyBuilder = CodeBlock.builder()
 
 
         val modelPropNames = modelPropertySpecs.map { it.name }
-        val propertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
+        val dtoPropertySpecs = dtoPropertySpecs.filter { it.name in modelPropNames }
 
-        if (propertySpecs.isNotEmpty()) {
-            val props = propertySpecs.joinToString(",\n\t", "\n\t", "\n") {
-                val modelProp = modelPropertySpecs.firstOrNull { model -> model.name == it.name }
+        if (dtoPropertySpecs.isNotEmpty()) {
+            val props = dtoPropertySpecs.joinToString(",\n\t", "\n\t", "\n") { dtoProp ->
+                val modelProp = modelPropertySpecs.firstOrNull { model -> model.name == dtoProp.name }
 
                 if (modelProp != null &&
                     modelProp.type != firstImplementationDTO(modelProp.type)
@@ -653,29 +653,31 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
                         val keyMapper =
                             if (keyGeneric in implementedTypes) {
-                                val typeName: String = registerAndGetExtForTypeName(keyGeneric, "to", settings)
+                                val typeName: String = registerAndGetExtForTypeName(keyGeneric, "to", dtoSettings)
                                 ".mapKeys { it.key.$typeName() }"
                             } else {
                                 ""
                             }
                         val valueMapper =
                             if (valueGeneric in implementedTypes) {
-                                val typeName: String = registerAndGetExtForTypeName(valueGeneric, "to", settings)
+                                val typeName: String = registerAndGetExtForTypeName(valueGeneric, "to", dtoSettings)
                                 ".mapValues { it.value.$typeName() }"
                             } else {
                                 ""
                             }
-                        "${it.name} = this.${it.name}$nullSafeCall$keyMapper$valueMapper"
+                        "${dtoProp.name} = this.${dtoProp.name}$nullSafeCall$keyMapper$valueMapper"
                     } else {
-                        val typeName: String = registerAndGetExtForTypeName(it.type, "to", settings)
+                        val typeName: String = registerAndGetExtForTypeName(dtoProp.type, "to", dtoSettings)
 
-                        "${it.name} = this.${it.name}$nullSafeCall.$typeName()"
+                        "${dtoProp.name} = this.${dtoProp.name}$nullSafeCall.$typeName()"
                     }
+                } else if(modelProp != null && modelProp.type.copy(nullable = false) != dtoProp.type.copy(nullable = false)) {
+                    "${dtoProp.name} = this.${dtoProp.name} as ${dtoProp.type.asClassName().simpleName}"
                 } else {
-                    "${it.name} = this.${it.name}"
+                    "${dtoProp.name} = this.${dtoProp.name}"
                 }
             }
-            funBodyBuilder.addStatement("return ${settings.implClassName.simpleName}(%L)", props)
+            funBodyBuilder.addStatement("return ${dtoSettings.implClassName.simpleName}(%L)", props)
         }
 
         extToBuilder.addCode(funBodyBuilder.build())
