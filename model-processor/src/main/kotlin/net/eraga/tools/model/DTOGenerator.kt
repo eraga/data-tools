@@ -123,7 +123,7 @@ class DTOGenerator(
 
             val defaultInit = propertyData.defaultInit
 
-            val type = determinePropertyType(element, propertyData, this)
+            val type = determinePropertyType(propertyData.propertySpec.type, this)
                 .let {
                     if (impl.ownSettings.propsForceNull)
                         it.copy(nullable = true)

@@ -71,3 +71,21 @@ open class DigitalProposalDetails(
 abstract class ProposalDetails : Serializable {
     val _className: String = this::class.java.canonicalName
 }
+
+interface ProposalListItem<T> {
+    val item: T
+}
+
+@Implement.Immutable
+interface SomeDetailModel {
+
+    val currentProposal: ProposalListItem<SomeDetailModel>?
+
+    @Implement.DTO
+    interface Detail : Copiable {
+        @Implement.Init("null")
+        val currentProposal: ProposalListItem<SomeDetailModel>?
+    }
+}
+
+

@@ -104,7 +104,7 @@ class ImmutableGenerator(
 
             val defaultInit = propertyData.defaultInit
 
-            val type = determinePropertyType(element, propertyData, this)
+            val type = determinePropertyType(propertyData.propertySpec.type, this)
 
             val kotlinProperty = PropertySpec.builder(name, type)
                 .mutable(true)

@@ -85,6 +85,7 @@ interface PersonModel :
 }
 
 
+
 //@Implement.Immutable("")
 //interface PersonJPAModel : PersonModel {
 //    override var id: Int

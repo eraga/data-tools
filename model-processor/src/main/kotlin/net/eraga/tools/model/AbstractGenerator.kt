@@ -70,64 +70,16 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
         supers.addAll(typeSpec.superinterfaces.keys)
 
         for (iface in supers) {
-            val ifaceFileSpec = iface.asFileSpec()
-            val ifaceTypeVars = ifaceFileSpec.singleTypeSpec().typeVariables.map { it.toString() }
-
-            val typeVarsToArgs = mutableMapOf<String, TypeName>()
-
-            if (ifaceTypeVars != iface.typeArguments().map { it.toString() }) {
-                ifaceTypeVars.forEachIndexed { index, it ->
-                    typeVarsToArgs[it] = iface.typeArguments()[index]
-                }
-            }
-
             val ifaceProperties = gatherProperties(
                 iface.asFileSpec(),
                 implClassName,
                 level + 1
             )
-            if(ifaceProperties.values.filter { it.propertySpec.type.toString() =="T?" }.isNotEmpty()) {
-                println(typeVarsToArgs)
-            }
-            // Replace generic type varaiables
-            if (typeVarsToArgs.isNotEmpty())
-                ifaceProperties.values.forEach {
-                    val isNullable = it.propertySpec.type.isNullable
-                    val type = it.propertySpec.type.copy(nullable = false)
-                    if (type !is ParameterizedTypeName &&
-                        type.toString() in typeVarsToArgs.keys
-                    ) {
-                        val builder = it.propertySpec.toBuilder(
-                            type = typeVarsToArgs[type.toString()]!!.copy(nullable = isNullable)
-                        )
-                        it.propertySpec = builder.build()
-                    } else if (
-                        type is ParameterizedTypeName
-                    ) {
-                        val remappedTypeArgs = mutableListOf<TypeName>()
-                        type.typeArguments.forEach { typeArgument ->
-                            val itIsNullable = typeArgument.isNullable
-                            val itType = typeArgument.copy(nullable = false)
 
-                            if (itType.toString() in typeVarsToArgs.keys) {
-                                remappedTypeArgs.add(
-                                    typeVarsToArgs[itType.toString()]!!.copy(nullable = itIsNullable)
-                                )
-                            } else {
-                                remappedTypeArgs.add(typeArgument)
-                            }
-                        }
-                        val builder = it.propertySpec.toBuilder(
-                            type = type.rawType.parameterizedBy(remappedTypeArgs).copy(nullable = isNullable)
-                        )
-                        it.propertySpec = builder.build()
-                    }
-                }
-
-            getters.putAll(
-                ifaceProperties
-            )
+            getters.putAll(processGenerics(iface, ifaceProperties))
         }
+
+//        getters.putAll(processGenerics(ClassName(spec.packageName, spec.name), implClassName, level))
 
         typeSpec.propertySpecs.forEach { originalPropertySpec ->
             var propertySpec = originalPropertySpec
@@ -164,7 +116,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                     val target = valueOf(targetElement.simpleName.toString())
 //                    println(classes?.first())
                     for (kclass in classes) {
-                        println("$kclass to $target")
+//                        println("$kclass to $target")
                         val annosToReplace = annotations.of(kclass)
                         if (annosToReplace.isEmpty())
                             continue
@@ -182,7 +134,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                                 }
                                 else -> {
                                     if (anno.useSiteTarget != null &&
-                                        anno.useSiteTarget!!.name.lowercase() == target.siteTarget)
+                                        anno.useSiteTarget!!.name.lowercase() == target.siteTarget
+                                    )
                                         continue
 
                                     annotationReplacements[anno] =
@@ -251,65 +204,133 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 isFinal = propertySpec.tags.values.filterIsInstance<ImmutableKmProperty>().first().isFinal
             )
         }
-        return getters
+        return processGenerics(ClassName(spec.packageName, spec.name), getters)
+    }
+
+    private fun processGenerics(
+        iface: TypeName,
+        ifaceProperties: Map<String, PropertyData>
+    ): Map<String, PropertyData> {
+        val ifaceFileSpec = iface.asFileSpec()
+        val ifaceTypeVars = ifaceFileSpec.singleTypeSpec().typeVariables.map { it.toString() }
+
+        val typeVarsToArgs = mutableMapOf<String, TypeName>()
+
+        if (iface.typeArguments().isNotEmpty() &&
+            ifaceTypeVars != iface.typeArguments().map { it.toString() }
+        ) {
+            ifaceTypeVars.forEachIndexed { index, it ->
+                typeVarsToArgs[it] = iface.typeArguments()[index]
+            }
+        }
+
+        if (ifaceProperties.values.any { it.propertySpec.name == "currentProposal" }) {
+            println(typeVarsToArgs)
+        }
+
+        /**
+         * Replace generic type variables
+         */
+        if (typeVarsToArgs.isNotEmpty())
+            ifaceProperties.values.forEach { propertyData ->
+                val isNullable = propertyData.propertySpec.type.isNullable
+                val nonNullType = propertyData.propertySpec.type.copy(nullable = false)
+                if (nonNullType !is ParameterizedTypeName &&
+                    nonNullType.toString() in typeVarsToArgs.keys
+                ) {
+                    val builder = propertyData.propertySpec.toBuilder(
+                        type = typeVarsToArgs[nonNullType.toString()]!!.copy(nullable = isNullable)
+                    )
+                    propertyData.propertySpec = builder.build()
+                } else if (
+                    nonNullType is ParameterizedTypeName
+                ) {
+                    val remappedTypeArgs = mutableListOf<TypeName>()
+                    nonNullType.typeArguments.forEach { typeArgument ->
+                        val itIsNullable = typeArgument.isNullable
+                        val itType = typeArgument.copy(nullable = false)
+
+                        if (itType.toString() in typeVarsToArgs.keys) {
+                            remappedTypeArgs.add(
+                                typeVarsToArgs[itType.toString()]!!.copy(nullable = itIsNullable)
+                            )
+                        } else {
+                            remappedTypeArgs.add(typeArgument)
+                        }
+                    }
+                    val builder = propertyData.propertySpec.toBuilder(
+                        type = (nonNullType.copy(nullable = isNullable) as ParameterizedTypeName).rawType.parameterizedBy(
+                            remappedTypeArgs
+                        ).copy(nullable = isNullable)
+                    )
+                    propertyData.propertySpec = builder.build()
+                }
+            }
+        return ifaceProperties
     }
 
     fun determinePropertyType(
-        element: TypeElement,
-        propertyData: PropertyData,
+        type: TypeName,
         generator: AbstractGenerator<*>
     ): TypeName {
-        return if (propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
-
-//                propertyData.typeSpec.syntheticMethodForAnnotations
-//                val generatedClass = getter.getAnnotation(GeneratedClass::class.java)
-
-            val isConstructorInitializer = { mirror: AnnotationMirror ->
-                mirror.annotationType.asElement().simpleName.toString() == GeneratedClass::class.java.simpleName
-            }
-            val annotatedProps: List<Element>? = element
-                .enclosedElements
-                .first {
-                    it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
-                }
-                .enclosedElements
-                ?.filter {
-                    it.simpleName.contains("annotations") &&
-                            it.annotationMirrors.any { mirror ->
-                                isConstructorInitializer(mirror)
-                            }
-                }
-
-
-            val propertyInitMap = annotatedProps?.filter {
-                it.annotationMirrors.any { mirror ->
-                    isConstructorInitializer(mirror)
-                }
-            }?.associateBy({
-                it.simpleName.split("$").first()
-            }, {
-                it.annotationMirrors
-                    .first { mirror ->
-                        isConstructorInitializer(mirror)
-                    }
-                    .elementValues
-                    .values
-                    .first()
-                    .value
-                    .toString()
-            })
-
-            if (propertyInitMap!!.values.first().isNotBlank())
-                ClassName.bestGuess(propertyInitMap.values.first())
-            else
-                propertyData.propertySpec.type
+        val isNullable = type.isNullable
+        return  if (generator is DTOGenerator) {
+            firstImplementationDTO(type).copy(nullable = isNullable)
         } else {
-            if (generator is DTOGenerator) {
-                firstImplementationDTO(propertyData.propertySpec.type)
-            } else {
-                firstImplementationImmutable(propertyData.propertySpec.type)
-            }
+            firstImplementationImmutable(type).copy(nullable = isNullable)
         }
+
+//        if (propertyData.propertySpec.type.toString() == "error.NonExistentClass") {
+//
+////                propertyData.typeSpec.syntheticMethodForAnnotations
+////                val generatedClass = getter.getAnnotation(GeneratedClass::class.java)
+//
+//            val isConstructorInitializer = { mirror: AnnotationMirror ->
+//                mirror.annotationType.asElement().simpleName.toString() == GeneratedClass::class.java.simpleName
+//            }
+//            val annotatedProps: List<Element>? = element
+//                .enclosedElements
+//                .first {
+//                    it.kind == ElementKind.CLASS && it.simpleName.toString() == "DefaultImpls"
+//                }
+//                .enclosedElements
+//                ?.filter {
+//                    it.simpleName.contains("annotations") &&
+//                            it.annotationMirrors.any { mirror ->
+//                                isConstructorInitializer(mirror)
+//                            }
+//                }
+//
+//
+//            val propertyInitMap = annotatedProps?.filter {
+//                it.annotationMirrors.any { mirror ->
+//                    isConstructorInitializer(mirror)
+//                }
+//            }?.associateBy({
+//                it.simpleName.split("$").first()
+//            }, {
+//                it.annotationMirrors
+//                    .first { mirror ->
+//                        isConstructorInitializer(mirror)
+//                    }
+//                    .elementValues
+//                    .values
+//                    .first()
+//                    .value
+//                    .toString()
+//            })
+//
+//            if (propertyInitMap!!.values.first().isNotBlank())
+//                ClassName.bestGuess(propertyInitMap.values.first())
+//            else
+//                propertyData.propertySpec.type
+//        } else {
+//            if (generator is DTOGenerator) {
+//                firstImplementationDTO(propertyData.propertySpec.type)
+//            } else {
+//                firstImplementationImmutable(propertyData.propertySpec.type)
+//            }
+//        }
     }
 
     fun constructorDefaultInitializer(
@@ -505,7 +526,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
         if (propertySpecs.isNotEmpty()) {
             for (prop in propertySpecs) {
-                val nullSafeCall = if(prop.type.isNullable) "?" else ""
+                val nullSafeCall = if (prop.type.isNullable) "?" else ""
                 if (prop.name !in defaultConstructorPropertiesNames) {
                     val modelProp = modelPropertySpecs.firstOrNull { it.name == prop.name }
                     if (modelProp != null &&
@@ -543,7 +564,8 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                                     } else {
                                         ""
                                     }
-                                val nullSafe = if(keyMapper.isNotBlank() || valueMapper.isNotBlank()) nullSafeCall else ""
+                                val nullSafe =
+                                    if (keyMapper.isNotBlank() || valueMapper.isNotBlank()) nullSafeCall else ""
                                 funBodyBuilder.add(
                                     "this.%L = $paramName.%L$nullSafe$keyMapper$valueMapper\n",
                                     prop.name,
@@ -642,7 +664,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
                 if (modelProp != null &&
                     modelProp.type != firstImplementationDTO(modelProp.type)
                 ) {
-                    val nullSafeCall = if(modelProp.type.isNullable) "?" else ""
+                    val nullSafeCall = if (modelProp.type.isNullable) "?" else ""
 
                     val type = firstImplementationDTO(modelProp.type)
                     if (type is ParameterizedTypeName && type.rawType.implements(Map::class.asTypeName())) {
@@ -671,7 +693,7 @@ abstract class AbstractGenerator<T : AbstractSettings<*>>(
 
                         "${dtoProp.name} = this.${dtoProp.name}$nullSafeCall.$typeName()"
                     }
-                } else if(modelProp != null && modelProp.type.copy(nullable = false) != dtoProp.type.copy(nullable = false)) {
+                } else if (modelProp != null && modelProp.type.copy(nullable = false) != dtoProp.type.copy(nullable = false)) {
                     "${dtoProp.name} = this.${dtoProp.name} as ${dtoProp.type.asClassName().simpleName}"
                 } else {
                     "${dtoProp.name} = this.${dtoProp.name}"
